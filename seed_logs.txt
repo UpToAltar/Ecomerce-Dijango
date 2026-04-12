@@ -1,0 +1,18 @@
+﻿product-service-1  | Migrations for 'domain':
+product-service-1  |   domain/migrations/0001_initial.py
+product-service-1  |     - Create model Category
+product-service-1  |     - Create model Product
+product-service-1  | Migrations for 'analytics':
+product-service-1  |   analytics/migrations/0001_initial.py
+product-service-1  |     - Create model UserClickEvent
+product-service-1  |     - Create model UserSearchLog
+product-service-1  |     - Create model UserProductView
+product-service-1  | Operations to perform:
+product-service-1  |   Apply all migrations: analytics, contenttypes, domain
+product-service-1  | Running migrations:
+product-service-1  |   No migrations to apply.
+product-service-1  | [2026-04-12 15:26:06 +0000] [10] [INFO] Starting gunicorn 22.0.0
+product-service-1  | [2026-04-12 15:26:06 +0000] [10] [INFO] Listening at: http://0.0.0.0:8000 (10)
+product-service-1  | [2026-04-12 15:26:06 +0000] [10] [INFO] Using worker: sync
+product-service-1  | [2026-04-12 15:26:06 +0000] [11] [INFO] Booting worker with pid: 11
+product-service-1  | [2026-04-12 15:26:06 +0000] [12] [INFO] Booting worker with pid: 12

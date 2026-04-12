@@ -1,8 +1,8 @@
-# API Gateway — Dockerfile
-# Replace with your actual setup.
-# See .ai/prompts/create-dockerfile.md for templates (Node.js, Python, Go, Nginx).
-#
-# Requirements: expose port 8000, route to backend services.
-
-# TODO: Replace with your actual Dockerfile.
-FROM scratch
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "gateway_config.asgi:application"]

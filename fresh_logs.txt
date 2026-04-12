@@ -1,0 +1,39 @@
+﻿product-service-1  | SystemCheckError: System check identified some issues:
+product-service-1  | 
+product-service-1  | ERRORS:
+product-service-1  | ?: (templates.E001) You have 'APP_DIRS': True in your TEMPLATES but also specify 'loaders' in OPTIONS. Either remove APP_DIRS or remove the 'loaders' option.
+product-service-1  | [2026-04-12 15:23:45 +0000] [8] [INFO] Starting gunicorn 22.0.0
+product-service-1  | [2026-04-12 15:23:45 +0000] [8] [INFO] Listening at: http://0.0.0.0:8000 (8)
+product-service-1  | [2026-04-12 15:23:45 +0000] [8] [INFO] Using worker: sync
+product-service-1  | [2026-04-12 15:23:45 +0000] [9] [INFO] Booting worker with pid: 9
+product-service-1  | [2026-04-12 15:23:45 +0000] [10] [INFO] Booting worker with pid: 10
+auth-service-1     | Migrations for 'domain':
+auth-service-1     |   domain/migrations/0001_initial.py
+auth-service-1     |     - Create model User
+auth-service-1     | Operations to perform:
+auth-service-1     |   Apply all migrations: admin, auth, contenttypes, domain, sessions
+auth-service-1     | Running migrations:
+auth-service-1     |   Applying contenttypes.0001_initial... OK
+auth-service-1     |   Applying contenttypes.0002_remove_content_type_name... OK
+auth-service-1     |   Applying auth.0001_initial... OK
+auth-service-1     |   Applying auth.0002_alter_permission_name_max_length... OK
+auth-service-1     |   Applying auth.0003_alter_user_email_max_length... OK
+auth-service-1     |   Applying auth.0004_alter_user_username_opts... OK
+auth-service-1     |   Applying auth.0005_alter_user_last_login_null... OK
+auth-service-1     |   Applying auth.0006_require_contenttypes_0002... OK
+auth-service-1     |   Applying auth.0007_alter_validators_add_error_messages... OK
+auth-service-1     |   Applying auth.0008_alter_user_username_max_length... OK
+auth-service-1     |   Applying auth.0009_alter_user_last_name_max_length... OK
+auth-service-1     |   Applying auth.0010_alter_group_name_max_length... OK
+auth-service-1     |   Applying auth.0011_update_proxy_permissions... OK
+auth-service-1     |   Applying auth.0012_alter_user_first_name_max_length... OK
+auth-service-1     |   Applying domain.0001_initial... OK
+auth-service-1     |   Applying admin.0001_initial... OK
+auth-service-1     |   Applying admin.0002_logentry_remove_auto_add... OK
+auth-service-1     |   Applying admin.0003_logentry_add_action_flag_choices... OK
+auth-service-1     |   Applying sessions.0001_initial... OK
+auth-service-1     | [2026-04-12 15:23:46 +0000] [10] [INFO] Starting gunicorn 22.0.0
+auth-service-1     | [2026-04-12 15:23:46 +0000] [10] [INFO] Listening at: http://0.0.0.0:8000 (10)
+auth-service-1     | [2026-04-12 15:23:46 +0000] [10] [INFO] Using worker: sync
+auth-service-1     | [2026-04-12 15:23:46 +0000] [11] [INFO] Booting worker with pid: 11
+auth-service-1     | [2026-04-12 15:23:46 +0000] [12] [INFO] Booting worker with pid: 12

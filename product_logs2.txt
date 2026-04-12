@@ -1,0 +1,67 @@
+﻿product-service-1  | Traceback (most recent call last):
+product-service-1  |   File "/app/manage.py", line 8, in <module>
+product-service-1  |     main()
+product-service-1  |   File "/app/manage.py", line 6, in main
+product-service-1  |     execute_from_command_line(sys.argv)
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+product-service-1  |     utility.execute()
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/__init__.py", line 436, in execute
+product-service-1  |     self.fetch_command(subcommand).run_from_argv(self.argv)
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 412, in run_from_argv
+product-service-1  |     self.execute(*args, **cmd_options)
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 453, in execute
+product-service-1  |     self.check()
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 485, in check
+product-service-1  |     all_issues = checks.run_checks(
+product-service-1  |                  ^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/checks/registry.py", line 88, in run_checks
+product-service-1  |     new_errors = check(app_configs=app_configs, databases=databases)
+product-service-1  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/checks/urls.py", line 14, in check_url_config
+product-service-1  |     return check_resolver(resolver)
+product-service-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/checks/urls.py", line 24, in check_resolver
+product-service-1  |     return check_method()
+product-service-1  |            ^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/urls/resolvers.py", line 494, in check
+product-service-1  |     for pattern in self.url_patterns:
+product-service-1  |                    ^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/utils/functional.py", line 57, in __get__
+product-service-1  |     res = instance.__dict__[self.name] = self.func(instance)
+product-service-1  |                                          ^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/urls/resolvers.py", line 715, in url_patterns
+product-service-1  |     patterns = getattr(self.urlconf_module, "urlpatterns", self.urlconf_module)
+product-service-1  |                        ^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/utils/functional.py", line 57, in __get__
+product-service-1  |     res = instance.__dict__[self.name] = self.func(instance)
+product-service-1  |                                          ^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/urls/resolvers.py", line 708, in urlconf_module
+product-service-1  |     return import_module(self.urlconf_name)
+product-service-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+product-service-1  |     return _bootstrap._gcd_import(name[level:], package, level)
+product-service-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+product-service-1  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+product-service-1  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+product-service-1  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+product-service-1  |   File "/app/config/urls.py", line 9, in <module>
+product-service-1  |     path('api/categories/', include('application.urls.category_urls')),
+product-service-1  |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/urls/conf.py", line 38, in include
+product-service-1  |     urlconf_module = import_module(urlconf_module)
+product-service-1  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+product-service-1  |     return _bootstrap._gcd_import(name[level:], package, level)
+product-service-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+product-service-1  |   File "<frozen importlib._bootstrap>", line 1135, in _find_and_load_unlocked
+product-service-1  | ModuleNotFoundError: No module named 'application.urls.category_urls'; 'application.urls' is not a package
+product-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Starting gunicorn 22.0.0
+product-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Listening at: http://0.0.0.0:8000 (8)
+product-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Using worker: sync
+product-service-1  | [2026-04-12 15:20:48 +0000] [9] [INFO] Booting worker with pid: 9
+product-service-1  | [2026-04-12 15:20:48 +0000] [10] [INFO] Booting worker with pid: 10

@@ -1,0 +1,50 @@
+﻿auth-service-1  | Traceback (most recent call last):
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/utils.py", line 69, in __getitem__
+auth-service-1  |     return self._engines[alias]
+auth-service-1  |            ~~~~~~~~~~~~~^^^^^^^
+auth-service-1  | KeyError: 'django'
+auth-service-1  | 
+auth-service-1  | During handling of the above exception, another exception occurred:
+auth-service-1  | 
+auth-service-1  | Traceback (most recent call last):
+auth-service-1  |   File "/app/manage.py", line 22, in <module>
+auth-service-1  |     main()
+auth-service-1  |   File "/app/manage.py", line 18, in main
+auth-service-1  |     execute_from_command_line(sys.argv)
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+auth-service-1  |     utility.execute()
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/__init__.py", line 436, in execute
+auth-service-1  |     self.fetch_command(subcommand).run_from_argv(self.argv)
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 412, in run_from_argv
+auth-service-1  |     self.execute(*args, **cmd_options)
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 453, in execute
+auth-service-1  |     self.check()
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 485, in check
+auth-service-1  |     all_issues = checks.run_checks(
+auth-service-1  |                  ^^^^^^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/core/checks/registry.py", line 88, in run_checks
+auth-service-1  |     new_errors = check(app_configs=app_configs, databases=databases)
+auth-service-1  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/contrib/admin/checks.py", line 78, in check_dependencies
+auth-service-1  |     for engine in engines.all():
+auth-service-1  |                   ^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/utils.py", line 94, in all
+auth-service-1  |     return [self[alias] for alias in self]
+auth-service-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/utils.py", line 94, in <listcomp>
+auth-service-1  |     return [self[alias] for alias in self]
+auth-service-1  |             ~~~~^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/utils.py", line 85, in __getitem__
+auth-service-1  |     engine = engine_cls(params)
+auth-service-1  |              ^^^^^^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/backends/django.py", line 26, in __init__
+auth-service-1  |     self.engine = Engine(self.dirs, self.app_dirs, **options)
+auth-service-1  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+auth-service-1  |   File "/usr/local/lib/python3.11/site-packages/django/template/engine.py", line 44, in __init__
+auth-service-1  |     raise ImproperlyConfigured(
+auth-service-1  | django.core.exceptions.ImproperlyConfigured: app_dirs must not be set when loaders is defined.
+auth-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Starting gunicorn 22.0.0
+auth-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Listening at: http://0.0.0.0:8000 (8)
+auth-service-1  | [2026-04-12 15:20:48 +0000] [8] [INFO] Using worker: sync
+auth-service-1  | [2026-04-12 15:20:48 +0000] [9] [INFO] Booting worker with pid: 9
+auth-service-1  | [2026-04-12 15:20:48 +0000] [10] [INFO] Booting worker with pid: 10

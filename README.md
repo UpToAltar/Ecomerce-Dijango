@@ -1,49 +1,65 @@
-# Project Name
+# E-commerce Microservice Project
 
-[![Stars](https://img.shields.io/github/stars/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/stargazers)
-[![Forks](https://img.shields.io/github/forks/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Brief description of the business process being automated and the service-oriented solution.
+> Hệ thống E-commerce xây dựng theo kiến trúc Microservices và Domain-Driven Design (DDD).
 
 > **New to this repo?** See [`GETTING_STARTED.md`](GETTING_STARTED.md) for setup instructions, workflow guide, and submission checklist.
 
 ---
 
-## Team Members
-
-| Name | Student ID | Role | Contribution |
-|------|------------|------|-------------|
-|      |            |      |             |
-
----
-
 ## Business Process
 
-*(Summarize the **one business process** being automated — domain, actors, scope. Example: "Customer places an order and receives delivery in the Online Food Delivery domain.")*
+Hệ thống cung cấp trải nghiệm mua sắm e-commerce đầy đủ:
+- **Khách hàng**: Đăng nhập, tìm kiếm sản phẩm, thêm vào giỏ hàng, đặt hàng, thanh toán, và đánh giá.
+- **Nhân viên (Staff)**: Quản lý sản phẩm, tồn kho, duyệt đơn hàng.
+- **Admin**: Quản lý người dùng, phân quyền hệ thống.
+ Hệ thống hỗ trợ tính năng behavior tracking lưu lịch sử người dùng để phục vụ phân tích dữ liệu và AI suggest.
 
 ---
 
 ## Architecture
 
-*(Paste or update the architecture diagram from [`docs/architecture.md`](docs/architecture.md) here.)*
-
 ```mermaid
 graph LR
     U[User] --> FE[Frontend :3000]
-    FE --> GW[API Gateway :8080]
-    GW --> SA[Service A :5001]
-    GW --> SB[Service B :5002]
-    SA --> DB1[(Database A)]
-    SB --> DB2[(Database B)]
+    FE --> GW[API Gateway :8000]
+    
+    GW --> SA[Auth :8001]
+    GW --> SP[Product :8002]
+    GW --> SC[Cart :8003]
+    GW --> SO[Order :8004]
+    GW --> SPy[Payment :8005]
+    GW --> SN[Notification :8006]
+    GW --> SR[Review :8007]
+    
+    SA --> DB1[(auth_db)]
+    SP --> DB2[(product_db)]
+    SC --> DB3[(cart_db)]
+    SO --> DB4[(order_db)]
+    SPy --> DB5[(payment_db)]
+    SN --> DB6[(notification_db)]
+    SR --> DB7[(review_db)]
+    
+    SP -.-> R[Redis :6379]
+    SC -.-> R
+    
+    SO -.-> RM[RabbitMQ :5672]
+    SPy -.-> RM
+    SN -.-> RM
 ```
 
-| Component     | Responsibility | Tech Stack | Port |
-|---------------|----------------|------------|------|
-| **Frontend**  |                |            | 3000 |
-| **Gateway**   |                |            | 8080 |
-| **Service A** |                |            | 5001 |
-| **Service B** |                |            | 5002 |
+| Component | Port | Database | Responsibility |
+|-----------|------|----------|----------------|
+| **Frontend** | 3000 | - | ReactJS UI |
+| **API Gateway** | 8000 | - | Route & auth proxy |
+| **Auth Svc** | 8001 | auth_db | User & JWT |
+| **Product Svc** | 8002 | product_db | Products, inventory, tracking |
+| **Cart Svc** | 8003 | cart_db | Shopping cart |
+| **Order Svc** | 8004 | order_db | Orders & shipping |
+| **Payment Svc** | 8005 | payment_db | Payment gateways |
+| **Notification Svc** | 8006 | notification_db | Email/Alerts |
+| **Review Svc** | 8007 | review_db | Product ratings |
 
 ---
 
@@ -53,27 +69,21 @@ graph LR
 docker compose up --build
 ```
 
-Verify: `curl http://localhost:8080/health`
-
-> For full setup instructions, prerequisites, and development commands, see [`GETTING_STARTED.md`](GETTING_STARTED.md).
+Verify services:
+- Gateway: `http://localhost:8000/health/`
+- Products: `http://localhost:8002/api/products/`
+- Frontend: `http://localhost:3000`
 
 ---
 
-## Documentation
+## Features
 
-| Document | Description |
-|----------|-------------|
-| [`GETTING_STARTED.md`](GETTING_STARTED.md) | Setup, workflow, submission checklist |
-| [`docs/analysis-and-design.md`](docs/analysis-and-design.md) | Analysis & Design — Step-by-Step Action approach |
-| [`docs/analysis-and-design-ddd.md`](docs/analysis-and-design-ddd.md) | Analysis & Design — Domain-Driven Design approach |
-| [`docs/architecture.md`](docs/architecture.md) | Architecture patterns, components & deployment |
-| [`docs/api-specs/`](docs/api-specs/) | OpenAPI 3.0 specifications for each service |
+- **Tách biệt DB (Database per service)**: Đảm bảo độc lập dữ liệu theo chuẩn Microservices.
+- **DDD Architecture**: Cấu trúc domain, application, infrastructure rõ ràng ở từng service.
+- **Stock Lock**: Redis distributed lock chống race condition khi mua hàng.
+- **Async Events**: Giao tiếp RabbitMQ (ví dụ: tạo đơn → trừ kho → thông báo).
 
 ---
 
 ## License
-
-This project uses the [MIT License](LICENSE).
-
-> Template by [Hung Dang](https://github.com/hungdn1701) · [Template guide](GETTING_STARTED.md)
-
+[MIT License](LICENSE)

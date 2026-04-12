@@ -1,15 +1,276 @@
-# Docker Compose — Multi-container orchestration
+# Docker Compose — E-commerce Microservice Platform
 # Run: docker compose up --build
-# Docs: https://docs.docker.com/compose/
 
 services:
-  # ─── Frontend ────────────────────────────────────
-  frontend:
-    build: ./frontend
+  # ─── Databases (Separate per Service) ───────────────────
+  postgres-auth:
+    image: postgres:15-alpine
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-product:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d product_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-cart:
+    image: postgres:15-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: cart_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d cart_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-order:
+    image: postgres:15-alpine
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-payment:
+    image: postgres:15-alpine
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-notification:
+    image: postgres:15-alpine
+    ports:
+      - "5437:5432"
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d notification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  postgres-review:
+    image: postgres:15-alpine
+    ports:
+      - "5438:5432"
+    environment:
+      POSTGRES_DB: review_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: changeme
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d review_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ─── Shared Infrastructure ─────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ─── Services ───────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "8001:8000"
+    environment:
+      - DB_HOST=postgres-auth
+      - DB_NAME=auth_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - RABBITMQ_HOST=rabbitmq
     depends_on:
-      - gateway
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  product-service:
+    build: ./services/product-service
+    ports:
+      - "8002:8000"
+    environment:
+      - DB_HOST=postgres-product
+      - DB_NAME=product_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      postgres-product:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  cart-service:
+    build: ./services/cart-service
+    ports:
+      - "8003:8000"
+    environment:
+      - DB_HOST=postgres-cart
+      - DB_NAME=cart_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - REDIS_HOST=redis
+    depends_on:
+      postgres-cart:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "8004:8000"
+    environment:
+      - DB_HOST=postgres-order
+      - DB_NAME=order_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - RABBITMQ_HOST=rabbitmq
+      - PRODUCT_SERVICE_URL=http://product-service:8000
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  payment-service:
+    build: ./services/payment-service
+    ports:
+      - "8005:8000"
+    environment:
+      - DB_HOST=postgres-payment
+      - DB_NAME=payment_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - RABBITMQ_HOST=rabbitmq
+      - ORDER_SERVICE_URL=http://order-service:8000
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "8006:8000"
+    environment:
+      - DB_HOST=postgres-notification
+      - DB_NAME=notification_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  review-service:
+    build: ./services/review-service
+    ports:
+      - "8007:8000"
+    environment:
+      - DB_HOST=postgres-review
+      - DB_NAME=review_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - PRODUCT_SERVICE_URL=http://product-service:8000
+    depends_on:
+      postgres-review:
+        condition: service_healthy
     networks:
       - app-network
 
@@ -17,70 +278,31 @@ services:
   gateway:
     build: ./gateway
     ports:
-      - "${GATEWAY_PORT:-8080}:8000"
+      - "8000:8000"
     depends_on:
-      - service-a
-      - service-b
+      - auth-service
+      - product-service
+      - cart-service
+      - order-service
+      - payment-service
+      - notification-service
+      - review-service
     networks:
       - app-network
 
-  # ─── Service A ───────────────────────────────────
-  service-a:
-    build: ./services/service-a
+  # ─── Frontend ────────────────────────────────────
+  frontend:
+    build: ./frontend
     ports:
-      - "${SERVICE_A_PORT:-5001}:5000"
-    env_file:
-      - .env
+      - "3000:3000"
+    depends_on:
+      - gateway
     networks:
       - app-network
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-
-  # ─── Service B ───────────────────────────────────
-  service-b:
-    build: ./services/service-b
-    ports:
-      - "${SERVICE_B_PORT:-5002}:5000"
-    env_file:
-      - .env
-    networks:
-      - app-network
-
-  # ─── Shared Infrastructure (uncomment as needed) ─
-  # db:
-  #   image: postgres:16-alpine    # or mysql:8, mongo:7, etc.
-  #   ports:
-  #     - "${DB_PORT:-5432}:5432"
-  #   environment:
-  #     POSTGRES_DB: ${DB_NAME:-mydb}
-  #     POSTGRES_USER: ${DB_USER:-admin}
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-  #   volumes:
-  #     - db-data:/var/lib/postgresql/data
-  #   networks:
-  #     - app-network
-
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - app-network
-
-  # rabbitmq:
-  #   image: rabbitmq:3-management-alpine
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - app-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 networks:
   app-network:
     driver: bridge
-
-# volumes:
-#   db-data:
