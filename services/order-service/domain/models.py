@@ -2,6 +2,7 @@ import uuid
 import random
 import string
 from django.db import models
+from django.utils import timezone
 
 
 def generate_order_number():
@@ -28,6 +29,7 @@ class Order(models.Model):
     shipping_address = models.JSONField(default=dict)
     payment_method = models.CharField(max_length=50, default='cod')
     note = models.TextField(blank=True, null=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

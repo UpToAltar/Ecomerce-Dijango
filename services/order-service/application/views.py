@@ -3,11 +3,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.db import transaction
+from django.utils import timezone
 from domain.models import Order, OrderItem, ShippingTracking
 from .serializers import (
     OrderSerializer, OrderCreateSerializer, OrderStatusUpdateSerializer,
     ShippingTrackingSerializer,
 )
+from infrastructure.rabbitmq import publish_order_expiry, publish_event
 
 
 class OrderListView(APIView):
@@ -41,13 +43,20 @@ class OrderCreateView(APIView):
             for item in items_data
         )
 
+        # Set expiry only for VNPay orders (15 minutes)
+        payment_method = d.get('payment_method', 'cod')
+        expires_at = None
+        if payment_method == 'vnpay':
+            expires_at = timezone.now() + timezone.timedelta(minutes=15)
+
         order = Order.objects.create(
             user_id=d['user_id'],
             total_amount=total + int(d.get('shipping_fee', 0)),
             shipping_fee=d.get('shipping_fee', 0),
             shipping_address=d['shipping_address'],
-            payment_method=d.get('payment_method', 'cod'),
+            payment_method=payment_method,
             note=d.get('note', ''),
+            expires_at=expires_at,
         )
 
         for item in items_data:
@@ -60,6 +69,23 @@ class OrderCreateView(APIView):
                 quantity=item['quantity'],
                 subtotal=int(item['product_price']) * int(item['quantity']),
             )
+
+        # Publish DLX expiry message for VNPay orders
+        if payment_method == 'vnpay':
+            publish_order_expiry(str(order.id))
+
+        # Publish order.created event
+        publish_event(
+            exchange='order.events',
+            routing_key='order.created',
+            payload={
+                'order_id': str(order.id),
+                'order_number': order.order_number,
+                'user_id': str(order.user_id),
+                'total_amount': str(order.total_amount),
+                'payment_method': payment_method,
+            },
+        )
 
         return Response(
             OrderSerializer(order).data,
@@ -111,6 +137,18 @@ class OrderCancelView(APIView):
 
         order.status = Order.Status.CANCELLED
         order.save()
+
+        # Publish cancelled event
+        publish_event(
+            exchange='order.events',
+            routing_key='order.cancelled',
+            payload={
+                'order_id': str(order.id),
+                'order_number': order.order_number,
+                'user_id': str(order.user_id),
+            },
+        )
+
         return Response(OrderSerializer(order).data)
 
 

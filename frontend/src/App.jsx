@@ -4,29 +4,40 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import Header from './components/Header';
 import Home from './pages/Home';
+import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Cart from './pages/Cart';
-import './index.css';
+import Checkout from './pages/Checkout';
+import PaymentResult from './pages/PaymentResult';
+import Orders from './pages/Orders';
+import OrderDetail from './pages/OrderDetail';
 
-export default function App() {
+function App() {
   return (
     <AuthProvider>
       <CartProvider>
         <Router>
-          <div className="app-wrapper">
+          <div className="app">
             <Header />
-            <div style={{ paddingTop: '80px' }}>
+            <main className="main-content">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/products/:slug" element={<ProductDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/payment-result" element={<PaymentResult />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/orders/:id" element={<OrderDetail />} />
               </Routes>
-            </div>
+            </main>
           </div>
         </Router>
       </CartProvider>
     </AuthProvider>
   );
 }
+
+export default App;

@@ -1,112 +1,92 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, CreditCard } from 'lucide-react';
-import axios from 'axios';
 
 export default function Cart() {
-  const { cartItems, clearCart } = useCart();
+  const { cartItems, removeItem, updateQuantity, clearCart, cartTotal } = useCart();
   const { user } = useAuth();
-  const [address, setAddress] = useState('123 Main St');
+  const navigate = useNavigate();
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  };
-
-  const calculateTotal = () => {
-    // Demo calculation: assuming product objects have price appended
-    return cartItems.reduce((acc, item) => acc + (item.price || 500000) * item.quantity, 0);
-  };
-
-  const handleCheckout = async () => {
-    if (!user) return alert("Please log in");
-    
-    // Demo Order Creation directly to gateway
-    try {
-      await axios.post('http://localhost:8000/api/orders/create/', {
-        user_id: user.id,
-        shipping_address: { address },
-        payment_method: 'cod',
-        items: cartItems.map(item => ({
-          product_id: item.product_id,
-          product_price: item.price || 500000,
-          quantity: item.quantity
-        }))
-      });
-      clearCart();
-      alert("Order placed successfully!");
-    } catch (err) {
-      alert("Checkout demo mode: Order submitted.");
-      clearCart();
-    }
-  };
+  const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
 
   if (cartItems.length === 0) {
     return (
       <div className="container" style={{ textAlign: 'center', padding: '100px 20px' }}>
-        <ShoppingCart size={48} color="var(--color-text-muted)" style={{ margin: '0 auto 24px' }} />
-        <h2>Your Cart is Empty</h2>
-        <p style={{ marginTop: '12px', color: 'var(--color-text-secondary)' }}>Looks like you haven't added anything yet.</p>
-        <button className="btn btn-primary" style={{ marginTop: '24px' }} onClick={() => window.location.href='/'}>
-          Start Shopping
-        </button>
+        <ShoppingBag size={64} color="var(--color-text-muted)" style={{ margin: '0 auto 24px', opacity: 0.3 }} />
+        <h2>Giỏ hàng trống</h2>
+        <p style={{ marginTop: '12px', color: 'var(--color-text-secondary)' }}>Bạn chưa thêm sản phẩm nào.</p>
+        <Link to="/" className="btn btn-primary" style={{ display: 'inline-flex', marginTop: '24px', gap: '8px', alignItems: 'center' }}>
+          Tiếp tục mua sắm <ArrowRight size={16} />
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ padding: '60px 20px' }}>
-      <h2 style={{ marginBottom: '32px' }}>Shopping Cart</h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {cartItems.map((item, idx) => (
-            <div key={idx} className="product-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ width: '80px', height: '80px', background: '#f1f5f9', borderRadius: '8px' }} />
-              <div style={{ flex: 1 }}>
-                <h4 style={{ fontSize: '1.1rem' }}>Product ID: {item.product_id?.split('-')[0]}</h4>
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Quantity: {item.quantity}</p>
-                <p style={{ fontWeight: 600, marginTop: '8px' }}>{formatPrice(item.price || 500000)}</p>
+    <div className="container" style={{ padding: '40px 20px' }}>
+      <h2 style={{ marginBottom: '32px' }}>🛒 Giỏ hàng ({cartItems.length} sản phẩm)</h2>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px' }}>
+        {/* Cart Items */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {cartItems.map((item) => (
+            <div key={item.id} className="product-card" style={{ padding: '16px', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: 'var(--color-surface-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {item.product_image
+                  ? <img src={item.product_image} alt={item.product_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <ShoppingBag size={32} color="var(--color-text-muted)" />
+                }
               </div>
-              <button className="icon-btn" style={{ color: 'var(--color-danger)' }}>
-                <Trash2 size={20} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontSize: '1rem', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {item.product_name || `Sản phẩm ${item.product_id?.split('-')[0]}`}
+                </h4>
+                <p style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{formatPrice(item.price)}</p>
+              </div>
+              {/* Qty controls */}
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                <button onClick={() => updateQuantity(item.product_id, item.quantity - 1)} style={{ padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}><Minus size={14} /></button>
+                <span style={{ padding: '8px 12px', fontWeight: 600, minWidth: '36px', textAlign: 'center' }}>{item.quantity}</span>
+                <button onClick={() => updateQuantity(item.product_id, item.quantity + 1)} style={{ padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}><Plus size={14} /></button>
+              </div>
+              <span style={{ fontWeight: 700, minWidth: '100px', textAlign: 'right' }}>{formatPrice(item.price * item.quantity)}</span>
+              <button onClick={() => removeItem(item.product_id)} style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
+                <Trash2 size={18} />
               </button>
             </div>
           ))}
-          
-          <button className="btn btn-outline" onClick={clearCart} style={{ alignSelf: 'flex-start' }}>
-            Clear Cart
+          <button className="btn btn-outline" onClick={clearCart} style={{ alignSelf: 'flex-start', fontSize: '0.85rem' }}>
+            Xoá tất cả
           </button>
         </div>
 
-        <div className="product-card" style={{ padding: '24px', height: 'fit-content' }}>
-          <h3 style={{ marginBottom: '24px' }}>Order Summary</h3>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Subtotal</span>
-            <span>{formatPrice(calculateTotal())}</span>
+        {/* Summary */}
+        <div className="product-card" style={{ padding: '24px', height: 'fit-content', position: 'sticky', top: '100px' }}>
+          <h3 style={{ marginBottom: '20px' }}>Tổng đơn hàng</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: 'var(--color-text-secondary)' }}>
+            <span>Tạm tính</span>
+            <span>{formatPrice(cartTotal)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--color-border)' }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Shipping</span>
-            <span>Free</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', color: 'var(--color-text-secondary)' }}>
+            <span>Phí vận chuyển</span>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>Miễn phí</span>
           </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', fontSize: '1.2rem', fontWeight: 700 }}>
-            <span>Total</span>
-            <span style={{ color: 'var(--color-primary)' }}>{formatPrice(calculateTotal())}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 800, borderTop: '1px solid var(--color-border)', paddingTop: '20px', marginBottom: '24px' }}>
+            <span>Tổng cộng</span>
+            <span style={{ color: 'var(--color-primary)' }}>{formatPrice(cartTotal)}</span>
           </div>
-
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Shipping Address</label>
-            <input 
-              value={address} onChange={e => setAddress(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--color-border)' }}
-            />
-          </div>
-
-          <button className="btn btn-primary" onClick={handleCheckout} style={{ width: '100%' }}>
-            <CreditCard size={18} /> Checkout Securely
-          </button>
+          {user ? (
+            <button className="btn btn-primary" style={{ width: '100%', height: '48px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              onClick={() => navigate('/checkout')}>
+              Đặt hàng <ArrowRight size={18} />
+            </button>
+          ) : (
+            <Link to="/login" className="btn btn-primary" style={{ width: '100%', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              Đăng nhập để đặt hàng
+            </Link>
+          )}
         </div>
       </div>
     </div>
