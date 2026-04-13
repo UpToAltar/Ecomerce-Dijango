@@ -65,3 +65,26 @@ class RedisStockLock:
         """Invalidate stock cache."""
         key = f'stock:{product_id}'
         self.client.delete(key)
+
+    # --- Temporary Lock Counting Methods ---
+
+    def lock_stock(self, product_id, quantity=1):
+        """Increment the temporary locked stock for a product."""
+        key = f'product_locked:{product_id}'
+        return self.client.incrby(key, quantity)
+
+    def release_lock(self, product_id, quantity=1):
+        """Decrement the temporary locked stock for a product (e.g. on cancel)."""
+        key = f'product_locked:{product_id}'
+        # Don't let it go below 0 ideally
+        current = self.client.decrby(key, quantity)
+        if current < 0:
+            self.client.set(key, 0)
+            return 0
+        return current
+
+    def get_locked_stock(self, product_id):
+        """Get the current locked stock quantity."""
+        key = f'product_locked:{product_id}'
+        val = self.client.get(key)
+        return int(val) if val else 0

@@ -96,18 +96,44 @@ class ProductViewSet(viewsets.ModelViewSet):
         })
 
 
-class DeductStockView(APIView):
-    """POST /internal/products/<product_id>/deduct-stock/
-    Deduct stock with Redis distributed lock to prevent oversell.
+class LockStockView(APIView):
+    """POST /internal/products/<product_id>/lock-stock/
+    Increments Redis lock without changing DB.
     """
     permission_classes = [AllowAny]
 
     def post(self, request, product_id):
+        from infrastructure.redis_client import RedisStockLock
+        client = RedisStockLock()
         quantity = int(request.data.get('quantity', 1))
-        lock_key = f'stock:lock:{product_id}'
-        r = _get_redis()
+        
+        try:
+            product = Product.objects.get(id=product_id)
+            if product.available_stock < quantity:
+                return Response({'error': 'Insufficient available stock'}, status=400)
+            
+            client.lock_stock(str(product_id), quantity)
+            return Response({'success': True, 'available_stock': product.available_stock})
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
-        # Try to acquire lock (5 second TTL)
+
+class CommitStockView(APIView):
+    """POST /internal/products/<product_id>/commit-stock/
+    Decrements DB stock and removes Redis lock.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, product_id):
+        from infrastructure.redis_client import RedisStockLock
+        client = RedisStockLock()
+        quantity = int(request.data.get('quantity', 1))
+        
+        lock_key = f'stock:lock:commit:{product_id}'
+        r = _get_redis()
+        # use distributed lock to prevent race condition during DB update
         acquired = r.set(lock_key, '1', nx=True, ex=5)
         if not acquired:
             return Response({'error': 'Stock operation in progress, retry'}, status=409)
@@ -118,53 +144,37 @@ class DeductStockView(APIView):
                     product = Product.objects.select_for_update().get(id=product_id)
                 except Product.DoesNotExist:
                     return Response({'error': 'Product not found'}, status=404)
-
-                if product.stock_quantity < quantity:
-                    return Response({'error': 'Insufficient stock'}, status=400)
 
                 product.stock_quantity = F('stock_quantity') - quantity
                 product.sold_count = F('sold_count') + quantity
                 product.save(update_fields=['stock_quantity', 'sold_count'])
-                product.refresh_from_db()
-
+                
+            client.release_lock(str(product_id), quantity)
+            product.refresh_from_db()
             return Response({
                 'success': True,
-                'stock_quantity': product.stock_quantity,
+                'available_stock': product.available_stock,
             })
         finally:
             r.delete(lock_key)
 
 
-class RestoreStockView(APIView):
-    """POST /internal/products/<product_id>/restore-stock/
-    Restore stock when order is cancelled/expired.
+class ReleaseStockDelockView(APIView):
+    """POST /internal/products/<product_id>/release-stock/
+    Releases Redis lock without changing DB.
     """
     permission_classes = [AllowAny]
 
     def post(self, request, product_id):
+        from infrastructure.redis_client import RedisStockLock
+        client = RedisStockLock()
         quantity = int(request.data.get('quantity', 1))
-        lock_key = f'stock:lock:{product_id}'
-        r = _get_redis()
-
-        acquired = r.set(lock_key, '1', nx=True, ex=5)
-        if not acquired:
-            return Response({'error': 'Stock operation in progress, retry'}, status=409)
-
+        
         try:
-            with transaction.atomic():
-                try:
-                    product = Product.objects.select_for_update().get(id=product_id)
-                except Product.DoesNotExist:
-                    return Response({'error': 'Product not found'}, status=404)
-
-                product.stock_quantity = F('stock_quantity') + quantity
-                product.sold_count = F('sold_count') - quantity
-                product.save(update_fields=['stock_quantity', 'sold_count'])
-                product.refresh_from_db()
-
-            return Response({
-                'success': True,
-                'stock_quantity': product.stock_quantity,
-            })
-        finally:
-            r.delete(lock_key)
+            product = Product.objects.get(id=product_id)
+            client.release_lock(str(product_id), quantity)
+            return Response({'success': True, 'available_stock': product.available_stock})
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)

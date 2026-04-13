@@ -36,13 +36,13 @@ def setup_dlx_topology(channel):
         exchange='order.dlx',
         routing_key='order.expired',
     )
-    # Holding queue: messages sit here for TTL=15min, then go to DLX
-    FIFTEEN_MIN_MS = 15 * 60 * 1000
+    # Holding queue: messages sit here for TTL=5min, then go to DLX
+    FIVE_MIN_MS = 5 * 60 * 1000
     channel.queue_declare(
-        queue='order.expiry_hold',
+        queue='order.expiry_hold_5m',
         durable=True,
         arguments={
-            'x-message-ttl': FIFTEEN_MIN_MS,
+            'x-message-ttl': FIVE_MIN_MS,
             'x-dead-letter-exchange': 'order.dlx',
             'x-dead-letter-routing-key': 'order.expired',
         },
@@ -50,14 +50,14 @@ def setup_dlx_topology(channel):
 
 
 def publish_order_expiry(order_id: str):
-    """Publish order to holding queue — will be dead-lettered after 15 min."""
+    """Publish order to holding queue — will be dead-lettered after 5 min."""
     try:
         conn = _get_connection()
         channel = conn.channel()
         setup_dlx_topology(channel)
         channel.basic_publish(
             exchange='',
-            routing_key='order.expiry_hold',
+            routing_key='order.expiry_hold_5m',
             body=json.dumps({'order_id': str(order_id)}),
             properties=pika.BasicProperties(delivery_mode=2),
         )

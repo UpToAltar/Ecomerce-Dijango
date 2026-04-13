@@ -65,8 +65,15 @@ class Product(models.Model):
         return self.name
 
     @property
+    def available_stock(self):
+        from infrastructure.redis_client import RedisStockLock
+        client = RedisStockLock()
+        locked = client.get_locked_stock(str(self.id))
+        return max(0, self.stock_quantity - locked)
+
+    @property
     def is_in_stock(self):
-        return self.stock_quantity > 0
+        return self.available_stock > 0
 
     @property
     def discount_percent(self):

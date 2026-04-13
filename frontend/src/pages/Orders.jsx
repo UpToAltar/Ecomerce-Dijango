@@ -34,6 +34,16 @@ export default function Orders() {
     fetchOrders();
   }, [user, filter, authLoading]);
 
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn huỷ đơn hàng này?')) return;
+    try {
+      await axios.put(`${API}/orders/${orderId}/cancel/`);
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Huỷ đơn thất bại');
+    }
+  };
+
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
 
   const getStatusInfo = (status) => {
@@ -43,6 +53,15 @@ export default function Orders() {
       case 'completed': return { text: 'Hoàn thành', color: '#16a34a', icon: <CheckCircle size={16} /> };
       case 'cancelled': return { text: 'Đã huỷ', color: '#dc2626', icon: <XCircle size={16} /> };
       default: return { text: status, color: '#6b7280', icon: <Clock size={16} /> };
+    }
+  };
+
+  const getPaymentStatusText = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'pending': return { text: 'Chờ thanh toán', color: '#eab308' };
+      case 'completed': return { text: 'Đã thanh toán', color: '#16a34a' };
+      case 'failed': return { text: 'Thanh toán lỗi', color: '#dc2626' };
+      default: return { text: status || 'Không rõ', color: '#6b7280' };
     }
   };
 
@@ -87,6 +106,7 @@ export default function Orders() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {orders.map(order => {
             const stInfo = getStatusInfo(order.status);
+            const pInfo = getPaymentStatusText(order.payment_status);
             return (
               <div key={order.id} className="product-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
@@ -119,10 +139,24 @@ export default function Orders() {
                 ))}
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>Tổng tiền: <strong style={{ color: 'var(--color-primary)', fontSize: '1.2rem', marginLeft: '6px' }}>{formatPrice(order.total_amount)}</strong></span>
-                  <Link to={`/orders/${order.id}`} className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
-                    Xem chi tiết
-                  </Link>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Tổng tiền: <strong style={{ color: 'var(--color-primary)', fontSize: '1.2rem', marginLeft: '6px' }}>{formatPrice(order.total_amount)}</strong></span>
+                    {order.payment_status && (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                        Thanh toán: <span style={{ color: pInfo.color, fontWeight: 500 }}>{pInfo.text}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {(order.status === 'pending') && (
+                      <button onClick={() => handleCancelOrder(order.id)} className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.9rem', color: '#dc2626', borderColor: '#fca5a5' }}>
+                        Huỷ đơn
+                      </button>
+                    )}
+                    <Link to={`/orders/${order.id}`} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
+                      Xem chi tiết
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

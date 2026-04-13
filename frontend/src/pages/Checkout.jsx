@@ -44,6 +44,7 @@ export default function Checkout() {
 
       const orderPayload = {
         user_id: user.id,
+        user_email: user.email,
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
         note: form.note,

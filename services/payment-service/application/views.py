@@ -4,7 +4,7 @@ import hmac
 import urllib.parse
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
@@ -35,7 +35,7 @@ def _build_vnpay_url(amount: int, order_id: str, order_info: str, ip_addr: str =
 
     now = datetime.now()
     create_date = now.strftime('%Y%m%d%H%M%S')
-    expire_date = now.replace(minute=now.minute + 15).strftime('%Y%m%d%H%M%S')
+    expire_date = (now + timedelta(minutes=15)).strftime('%Y%m%d%H%M%S')
 
     params = {
         'vnp_Version': '2.1.0',
@@ -71,7 +71,7 @@ class PaymentCreateView(APIView):
         d = serializer.validated_data
         payment = Payment.objects.create(**d)
         if payment.method == Payment.Method.COD:
-            payment.status = Payment.Status.COMPLETED
+            payment.status = Payment.Status.PENDING
             payment.save()
             # Publish order.completed for notification
             publish_event(
@@ -108,6 +108,31 @@ class PaymentByOrderView(APIView):
     def get(self, request, order_id):
         payments = Payment.objects.filter(order_id=order_id)
         return Response(PaymentSerializer(payments, many=True).data)
+
+
+class PaymentBatchView(APIView):
+    """POST /api/payments/batch/ — Get payment statuses for multiple orders."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        order_ids = request.data.get('order_ids', [])
+        if not order_ids:
+            return Response({})
+        
+        # Get the latest payment for each order
+        payments = Payment.objects.filter(order_id__in=order_ids).order_by('-created_at')
+        
+        # Build dictionary { order_id: payment_status }
+        result = {}
+        for p in payments:
+            try:
+                order_id_str = str(p.order_id)
+                if order_id_str not in result:
+                    result[order_id_str] = p.status
+            except Exception:
+                pass
+                
+        return Response(result)
 
 
 class PaymentCallbackView(APIView):

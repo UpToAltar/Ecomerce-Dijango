@@ -44,14 +44,14 @@ class Command(BaseCommand):
         channel.queue_bind(
             exchange='order.events',
             queue='notification.order',
-            routing_key='order.completed',
+            routing_key='order.created',
         )
         channel.basic_qos(prefetch_count=1)
         channel.basic_consume(
             queue='notification.order',
             on_message_callback=self._on_message,
         )
-        self.stdout.write('[Notification] Waiting for order.completed events...')
+        self.stdout.write('[Notification] Waiting for order.created events...')
         channel.start_consuming()
 
     def _on_message(self, ch, method, properties, body):

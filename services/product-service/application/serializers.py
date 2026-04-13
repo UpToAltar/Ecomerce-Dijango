@@ -15,6 +15,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     discount_percent = serializers.ReadOnlyField()
     is_in_stock = serializers.ReadOnlyField()
+    stock_quantity = serializers.ReadOnlyField(source='available_stock')
 
     class Meta:
         model = Product
@@ -32,6 +33,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     category_id = serializers.UUIDField(write_only=True)
     discount_percent = serializers.ReadOnlyField()
     is_in_stock = serializers.ReadOnlyField()
+    stock_quantity = serializers.ReadOnlyField(source='available_stock')
 
     class Meta:
         model = Product

@@ -4,12 +4,17 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.db import transaction
 from django.utils import timezone
+from django.conf import settings
+import requests
 from domain.models import Order, OrderItem, ShippingTracking
 from .serializers import (
     OrderSerializer, OrderCreateSerializer, OrderStatusUpdateSerializer,
     ShippingTrackingSerializer,
 )
 from infrastructure.rabbitmq import publish_order_expiry, publish_event
+
+PRODUCT_SERVICE_URL = getattr(settings, 'PRODUCT_SERVICE_URL', 'http://product-service:8000')
+PAYMENT_SERVICE_URL = getattr(settings, 'PAYMENT_SERVICE_URL', 'http://payment-service:8000')
 
 
 class OrderListView(APIView):
@@ -24,7 +29,28 @@ class OrderListView(APIView):
         status_filter = request.query_params.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return Response(OrderSerializer(qs[:50], many=True).data)
+        
+        orders_data = OrderSerializer(qs[:50], many=True).data
+
+        # Fetch payment status for the batch
+        order_ids = [str(data['id']) for data in orders_data]
+        if order_ids:
+            try:
+                resp = requests.post(f'{PAYMENT_SERVICE_URL}/api/payments/batch/', json={'order_ids': order_ids}, timeout=5)
+                if resp.status_code == 200:
+                    payment_statuses = resp.json()
+                    for data in orders_data:
+                        data['payment_status'] = payment_statuses.get(str(data['id']), 'N/A')
+                else:
+                    for data in orders_data:
+                        data['payment_status'] = 'N/A'
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f'[OrderListView] Fetch payment statuses failed: {e}')
+                for data in orders_data:
+                    data['payment_status'] = 'N/A'
+
+        return Response(orders_data)
 
 
 class OrderCreateView(APIView):
@@ -38,16 +64,54 @@ class OrderCreateView(APIView):
         d = serializer.validated_data
 
         items_data = d['items']
+        
+        # 1. Deduct stock for all items FIRST
+        # If any deduction fails, raise exception to rollback the transaction
+        from rest_framework.exceptions import ValidationError
+        deducted_items = []
+        for item in items_data:
+            try:
+                resp = requests.post(
+                    f'{PRODUCT_SERVICE_URL}/internal/products/{item["product_id"]}/lock-stock/',
+                    json={'quantity': item['quantity']},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    deducted_items.append(item)
+                else:
+                    # Rollback potentially already deducted stock before raising
+                    for d_item in deducted_items:
+                        requests.post(
+                            f'{PRODUCT_SERVICE_URL}/internal/products/{d_item["product_id"]}/release-stock/',
+                            json={'quantity': d_item['quantity']},
+                            timeout=5,
+                        )
+                    raise ValidationError({'error': f"Sản phẩm {item.get('product_name', item['product_id'])} không đủ tồn kho hoặc đang bị khoá."})
+            except requests.RequestException as e:
+                # Rollback potentially already deducted stock before raising
+                for d_item in deducted_items:
+                    try:
+                        requests.post(
+                            f'{PRODUCT_SERVICE_URL}/internal/products/{d_item["product_id"]}/release-stock/',
+                            json={'quantity': d_item['quantity']},
+                            timeout=5,
+                        )
+                    except:
+                        pass
+                import logging
+                logging.getLogger(__name__).error(f'[OrderCreate] Deduct stock failed for {item["product_id"]}: {e}')
+                raise ValidationError({'error': 'Không thể kết nối đến service sản phẩm để trừ tồn kho.'})
+
         total = sum(
             int(item['product_price']) * int(item['quantity'])
             for item in items_data
         )
 
-        # Set expiry only for VNPay orders (15 minutes)
+        # Set expiry only for VNPay orders (5 minutes)
         payment_method = d.get('payment_method', 'cod')
         expires_at = None
         if payment_method == 'vnpay':
-            expires_at = timezone.now() + timezone.timedelta(minutes=15)
+            expires_at = timezone.now() + timezone.timedelta(minutes=5)
 
         order = Order.objects.create(
             user_id=d['user_id'],
@@ -82,8 +146,10 @@ class OrderCreateView(APIView):
                 'order_id': str(order.id),
                 'order_number': order.order_number,
                 'user_id': str(order.user_id),
+                'user_email': d.get('user_email', ''),
                 'total_amount': str(order.total_amount),
                 'payment_method': payment_method,
+                'items': items_data,
             },
         )
 
@@ -100,7 +166,26 @@ class OrderDetailView(APIView):
     def get(self, request, order_id):
         try:
             order = Order.objects.prefetch_related('items', 'tracking').get(id=order_id)
-            return Response(OrderSerializer(order).data)
+            order_data = OrderSerializer(order).data
+            
+            # Fetch single payment status
+            try:
+                resp = requests.get(f'{PAYMENT_SERVICE_URL}/api/payments/order/{order_id}/', timeout=5)
+                if resp.status_code == 200:
+                    payments = resp.json()
+                    if payments:
+                        latest = sorted(payments, key=lambda x: x.get('created_at', ''), reverse=True)[0]
+                        order_data['payment_status'] = latest.get('status', 'N/A')
+                    else:
+                        order_data['payment_status'] = 'N/A'
+                else:
+                    order_data['payment_status'] = 'N/A'
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f'[OrderDetail] Fetch payment status failed: {e}')
+                order_data['payment_status'] = 'N/A'
+                
+            return Response(order_data)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
 
@@ -137,6 +222,19 @@ class OrderCancelView(APIView):
 
         order.status = Order.Status.CANCELLED
         order.save()
+
+        # Restore locked stock
+        for item in order.items.all():
+            try:
+                requests.post(
+                    f'{PRODUCT_SERVICE_URL}/internal/products/{item.product_id}/release-stock/',
+                    json={'quantity': item.quantity},
+                    timeout=5,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f'[OrderCancelView] Stock restore failed for {item.product_id}: {e}')
+
 
         # Publish cancelled event
         publish_event(

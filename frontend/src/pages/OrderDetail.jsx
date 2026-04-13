@@ -47,6 +47,25 @@ export default function OrderDetail() {
     return () => clearInterval(interval);
   }, [order]);
 
+  const handleCancelOrder = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn huỷ đơn hàng này?')) return;
+    try {
+      await axios.put(`${API}/orders/${order.id}/cancel/`);
+      setOrder(prev => ({ ...prev, status: 'cancelled' }));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Huỷ đơn thất bại');
+    }
+  };
+
+  const getPaymentStatusText = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'pending': return { text: 'Chờ thanh toán', color: '#eab308' };
+      case 'completed': return { text: 'Đã thanh toán', color: '#16a34a' };
+      case 'failed': return { text: 'Thanh toán lỗi', color: '#dc2626' };
+      default: return { text: status || 'Không rõ', color: '#6b7280' };
+    }
+  };
+
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
 
   if (loading) return <div className="loader-container"><div className="spinner"></div></div>;
@@ -65,8 +84,15 @@ export default function OrderDetail() {
           <h2 style={{ marginBottom: '8px' }}>Chi tiết đơn hàng #{order.order_number}</h2>
           <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Ngày đặt: {new Date(order.created_at).toLocaleString('vi-VN')}</span>
         </div>
-        <div style={{ padding: '8px 16px', borderRadius: '20px', background: 'var(--color-surface-elevated)', fontWeight: 600, textTransform: 'capitalize', border: '1px solid var(--color-border)' }}>
-          Trạng thái: {order.status}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {(order.status === 'pending') && (
+            <button onClick={handleCancelOrder} className="btn btn-outline" style={{ padding: '8px 16px', color: '#dc2626', borderColor: '#fca5a5' }}>
+              Huỷ đơn
+            </button>
+          )}
+          <div style={{ padding: '8px 16px', borderRadius: '20px', background: 'var(--color-surface-elevated)', fontWeight: 600, textTransform: 'capitalize', border: '1px solid var(--color-border)' }}>
+            Trạng thái: {order.status}
+          </div>
         </div>
       </div>
 
@@ -150,8 +176,11 @@ export default function OrderDetail() {
 
           <div className="product-card" style={{ padding: '24px' }}>
              <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}><CreditCard size={18} /> Thanh toán</h3>
-            <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-              Phương thức: <strong style={{ color: 'var(--color-text)' }}>{order.payment_method === 'vnpay' ? 'VNPay' : 'Thanh toán trực tiếp (COD)'}</strong>
+            <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>Phương thức: <strong style={{ color: 'var(--color-text)' }}>{order.payment_method === 'vnpay' ? 'VNPay' : 'Thanh toán trực tiếp (COD)'}</strong></div>
+              {order.payment_status && (
+                <div>Trạng thái: <strong style={{ color: getPaymentStatusText(order.payment_status).color }}>{getPaymentStatusText(order.payment_status).text}</strong></div>
+              )}
             </div>
           </div>
         </div>

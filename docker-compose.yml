@@ -250,6 +250,29 @@ services:
     networks:
       - app-network
 
+  # Consumer for order.completed event — runs alongside order-service
+  order-completed-consumer:
+    build: ./services/order-service
+    command: python manage.py consume_completed_orders
+    environment:
+      - DB_HOST=postgres-order
+      - DB_NAME=order_db
+      - DB_USER=admin
+      - DB_PASSWORD=changeme
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIS_HOST=redis
+      - PRODUCT_SERVICE_URL=http://product-service:8000
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
   payment-service:
     build: ./services/payment-service
     ports:

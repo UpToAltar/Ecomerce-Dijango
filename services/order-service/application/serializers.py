@@ -30,6 +30,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderCreateSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
+    user_email = serializers.EmailField(required=False, allow_blank=True, default='')
     shipping_address = serializers.JSONField()
     payment_method = serializers.CharField(default='cod')
     note = serializers.CharField(required=False, allow_blank=True, default='')
