@@ -1,0 +1,295 @@
+openapi: 3.0.0
+info:
+  title: E-Commerce Microservices Platform API
+  description: Comprehensive API documentation for all services, including Gateway routes and internal microservice endpoints.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: API Gateway
+  - url: http://auth-service:8000
+    description: Internal Auth Service
+  - url: http://product-service:8000
+    description: Internal Product Service
+  - url: http://order-service:8000
+    description: Internal Order Service
+  - url: http://payment-service:8000
+    description: Internal Payment Service
+  - url: http://cart-service:8000
+    description: Internal Cart Service
+  - url: http://notification-service:8000
+    description: Internal Notification Service
+  - url: http://review-service:8000
+    description: Internal Review Service
+
+paths:
+  # ==========================================
+  # AUTH SERVICE
+  # ==========================================
+  /api/auth/register/:
+    post:
+      tags: [Auth]
+      summary: Register a new customer
+      operationId: registerUser
+      responses:
+        201: {description: Created}
+  /api/auth/login/:
+    post:
+      tags: [Auth]
+      summary: Login and get Access/Refresh tokens
+      operationId: loginUser
+      responses:
+        200: {description: Success}
+  /api/auth/refresh/:
+    post:
+      tags: [Auth]
+      summary: Use refresh token to get new access token
+      operationId: refreshToken
+      responses:
+        200: {description: Success}
+  /api/auth/profile/:
+    get:
+      tags: [Auth]
+      summary: Get current logged-in user info
+      security: [{bearerAuth: []}]
+      operationId: getProfile
+      responses:
+        200: {description: Success}
+  /api/auth/validate/:
+    post:
+      tags: [Auth-Internal]
+      summary: Internal token validation for Gateway
+      operationId: validateToken
+      responses:
+        200: {description: Valid}
+  /api/auth/users/:
+    get:
+      tags: [Auth]
+      summary: List users (Staff/Admin)
+      operationId: listUsers
+      responses:
+        200: {description: Success}
+  /api/auth/users/{id}/:
+    get:
+      tags: [Auth]
+      summary: Get user details
+      operationId: getUserDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        200: {description: Success}
+
+  # ==========================================
+  # PRODUCT SERVICE
+  # ==========================================
+  /api/products/:
+    get:
+      tags: [Products]
+      summary: Paginated product list with search/filter
+      operationId: listProducts
+      responses:
+        200: {description: Success}
+    post:
+      tags: [Products]
+      summary: Create product (Staff)
+      operationId: createProduct
+      responses:
+        201: {description: Created}
+  /api/products/{id}/:
+    get:
+      tags: [Products]
+      summary: Product detail
+      operationId: getProductDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        200: {description: Success}
+    put:
+      tags: [Products]
+      summary: Full update product (Staff)
+      operationId: updateProduct
+    delete:
+      tags: [Products]
+      summary: Delete product (Staff)
+      operationId: deleteProduct
+  /api/products/categories/:
+    get:
+      tags: [Products]
+      summary: List all categories
+      operationId: listCategories
+      responses:
+        200: {description: Success}
+    post:
+      tags: [Products]
+      summary: Create category (Staff)
+  /api/products/categories/{id}/:
+    get:
+      tags: [Products]
+      summary: Category detail
+    put: {tags: [Products]}
+    delete: {tags: [Products]}
+
+  # Analytics
+  /api/products/analytics/view/:
+    post:
+      tags: [Analytics]
+      summary: Track product view event
+  /api/products/analytics/search/:
+    post:
+      tags: [Analytics]
+      summary: Track search query
+  /api/products/analytics/event/:
+    post:
+      tags: [Analytics]
+      summary: Track click/cart event
+
+  # Product Internal (Stock Management)
+  /internal/products/{product_id}/lock-stock/:
+    post:
+      tags: [Stock-Internal]
+      summary: TTL 5min lock on product quantity (Redis)
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+  /internal/products/{product_id}/commit-stock/:
+    post:
+      tags: [Stock-Internal]
+      summary: Permanently deduct stock from DB and clear Redis lock
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+  /internal/products/{product_id}/release-stock/:
+    post:
+      tags: [Stock-Internal]
+      summary: Release Redis lock (Rollback/Expire/Cancel)
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+
+  # ==========================================
+  # CART SERVICE
+  # ==========================================
+  /api/cart/:
+    get:
+      tags: [Cart]
+      summary: Get cart content for current user
+  /api/cart/add/:
+    post:
+      tags: [Cart]
+      summary: Add product to cart
+  /api/cart/update/:
+    post:
+      tags: [Cart]
+      summary: Change quantity of product in cart
+  /api/cart/remove/:
+    post:
+      tags: [Cart]
+      summary: Remove a product from cart
+  /api/cart/clear/:
+    post:
+      tags: [Cart]
+      summary: Clear entire cart
+
+  # ==========================================
+  # ORDER SERVICE
+  # ==========================================
+  /api/orders/:
+    get:
+      tags: [Orders]
+      summary: View my orders
+  /api/orders/create/:
+    post:
+      tags: [Orders]
+      summary: create order and trigger stock lock
+  /api/orders/{order_id}/:
+    get:
+      tags: [Orders]
+      summary: Get order by ID
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+  /api/orders/{order_id}/status/:
+    put:
+      tags: [Orders]
+      summary: Administrative status change (Staff)
+  /api/orders/{order_id}/cancel/:
+    post:
+      tags: [Orders]
+      summary: Cancel order (only if PENDING)
+  /api/orders/{order_id}/tracking/:
+    post:
+      tags: [Orders]
+      summary: Post a shipping update
+
+  # ==========================================
+  # PAYMENT SERVICE
+  # ==========================================
+  /api/payments/create/:
+    post:
+      tags: [Payments]
+      summary: Create general payment (COD/Bank)
+  /api/payments/vnpay/create/:
+    post:
+      tags: [Payments]
+      summary: Get redirected to VNPay portal
+  /api/payments/vnpay/return/:
+    get:
+      tags: [Payments]
+      summary: Landing point for user redirect back from VNPay
+  /api/payments/{payment_id}/:
+    get:
+      tags: [Payments]
+      summary: Payment status lookup
+  /api/payments/order/{order_id}/:
+    get:
+      tags: [Payments]
+      summary: Find payments related to an order
+  /api/payments/{payment_id}/callback/:
+    post:
+      tags: [Payments]
+      summary: Server-to-server VNPay notify
+  /api/payments/batch/:
+    post:
+      tags: [Payments]
+      summary: Aggregated payment status for multiple orders
+
+  # ==========================================
+  # HEALTH CHECKS
+  # ==========================================
+  /health/:
+    get: {tags: [Health]}
+  /api/auth/health/:
+    get: {tags: [Health]}
+  /api/products/health/:
+    get: {tags: [Health]}
+  /api/orders/health/:
+    get: {tags: [Health]}
+  /api/payments/health/:
+    get: {tags: [Health]}
+  /api/cart/health/:
+    get: {tags: [Health]}
+  /api/notifications/health/:
+    get: {tags: [Health]}
+  /api/reviews/health/:
+    get: {tags: [Health]}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
