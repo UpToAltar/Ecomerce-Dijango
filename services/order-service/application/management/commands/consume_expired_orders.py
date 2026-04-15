@@ -21,18 +21,27 @@ class Command(BaseCommand):
     help = 'Consume expired order messages from DLX queue and cancel them.'
 
     def handle(self, *args, **options):
-        self.stdout.write('[DLX Consumer] Connecting to RabbitMQ...')
-        conn = _get_connection()
-        channel = conn.channel()
-        setup_dlx_topology(channel)
-
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(
-            queue='order.expired',
-            on_message_callback=self._on_expired,
-        )
-        self.stdout.write('[DLX Consumer] Waiting for expired orders...')
-        channel.start_consuming()
+        import time
+        retry = 0
+        while True:
+            try:
+                self.stdout.write(f'[DLX Consumer] Connecting to RabbitMQ... (attempt {retry + 1})')
+                conn = _get_connection()
+                channel = conn.channel()
+                setup_dlx_topology(channel)
+                channel.basic_qos(prefetch_count=1)
+                channel.basic_consume(
+                    queue='order.expired',
+                    on_message_callback=self._on_expired,
+                )
+                self.stdout.write('[DLX Consumer] Waiting for expired orders...')
+                retry = 0
+                channel.start_consuming()
+            except Exception as e:
+                retry += 1
+                wait = min(30, 5 * retry)
+                logger.error(f'[DLX Consumer] Error: {e}. Retrying in {wait}s...')
+                time.sleep(wait)
 
     def _on_expired(self, ch, method, properties, body):
         try:

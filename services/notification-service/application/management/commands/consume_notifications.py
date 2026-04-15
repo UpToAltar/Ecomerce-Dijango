@@ -31,28 +31,37 @@ class Command(BaseCommand):
     help = 'Consume order events and send email notifications.'
 
     def handle(self, *args, **options):
-        self.stdout.write('[Notification] Connecting to RabbitMQ...')
-        conn = _get_connection()
-        channel = conn.channel()
-
-        channel.exchange_declare(
-            exchange='order.events',
-            exchange_type='topic',
-            durable=True,
-        )
-        result = channel.queue_declare(queue='notification.order', durable=True)
-        channel.queue_bind(
-            exchange='order.events',
-            queue='notification.order',
-            routing_key='order.created',
-        )
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(
-            queue='notification.order',
-            on_message_callback=self._on_message,
-        )
-        self.stdout.write('[Notification] Waiting for order.created events...')
-        channel.start_consuming()
+        import time
+        retry = 0
+        while True:
+            try:
+                self.stdout.write(f'[Notification] Connecting to RabbitMQ... (attempt {retry + 1})')
+                conn = _get_connection()
+                channel = conn.channel()
+                channel.exchange_declare(
+                    exchange='order.events',
+                    exchange_type='topic',
+                    durable=True,
+                )
+                channel.queue_declare(queue='notification.order', durable=True)
+                channel.queue_bind(
+                    exchange='order.events',
+                    queue='notification.order',
+                    routing_key='order.created',
+                )
+                channel.basic_qos(prefetch_count=1)
+                channel.basic_consume(
+                    queue='notification.order',
+                    on_message_callback=self._on_message,
+                )
+                self.stdout.write('[Notification] Waiting for order.created events...')
+                retry = 0
+                channel.start_consuming()
+            except Exception as e:
+                retry += 1
+                wait = min(30, 5 * retry)
+                logger.error(f'[Notification] Error: {e}. Retrying in {wait}s...')
+                time.sleep(wait)
 
     def _on_message(self, ch, method, properties, body):
         try:

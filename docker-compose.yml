@@ -231,6 +231,7 @@ services:
   order-dlx-consumer:
     build: ./services/order-service
     command: python manage.py consume_expired_orders
+    restart: on-failure
     environment:
       - DB_HOST=postgres-order
       - DB_NAME=order_db
@@ -254,6 +255,7 @@ services:
   order-completed-consumer:
     build: ./services/order-service
     command: python manage.py consume_completed_orders
+    restart: on-failure
     environment:
       - DB_HOST=postgres-order
       - DB_NAME=order_db
@@ -324,6 +326,7 @@ services:
   notification-consumer:
     build: ./services/notification-service
     command: python manage.py consume_notifications
+    restart: on-failure
     env_file:
       - .env
     environment:
@@ -359,6 +362,29 @@ services:
     networks:
       - app-network
 
+  ai-service:
+    build: ./services/ai-service
+    ports:
+      - "8008:8000"
+    environment:
+      - PRODUCT_SERVICE_URL=http://product-service:8000
+      - ORDER_SERVICE_URL=http://order-service:8000
+      - REVIEW_SERVICE_URL=http://review-service:8000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=2
+      - DATA_DIR=/app/data
+    volumes:
+      - ai_models:/app/data/models
+      - ai_chromadb:/app/data/chromadb
+    depends_on:
+      product-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
   # ─── API Gateway ─────────────────────────────────
   gateway:
     build: ./gateway
@@ -374,6 +400,7 @@ services:
       - payment-service
       - notification-service
       - review-service
+      - ai-service
       - redis
     networks:
       - app-network
@@ -394,3 +421,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  ai_models:
+  ai_chromadb:

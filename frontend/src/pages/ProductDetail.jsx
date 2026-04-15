@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Star, ChevronLeft, Package, Truck, Shield } from 'lucide-react';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { getAIUserId, trackBehavior, behaviorHeaders } from '../utils/aiTracking';
 
 const API = 'http://localhost:8000/api';
 
@@ -10,6 +12,7 @@ export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
@@ -20,8 +23,12 @@ export default function ProductDetail() {
     const fetch = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API}/products/${slug}/`);
+        const userId = getAIUserId(user);
+        const res = await axios.get(`${API}/products/${slug}/`, {
+          headers: behaviorHeaders(userId),
+        });
         setProduct(res.data);
+        trackBehavior(userId, res.data.id, 'view_detail');
       } catch (err) {
         console.error('Product fetch error', err);
       } finally {
@@ -29,7 +36,7 @@ export default function ProductDetail() {
       }
     };
     fetch();
-  }, [slug]);
+  }, [slug, user]);
 
   if (loading) return <div className="loader-container" style={{ minHeight: '60vh' }}><div className="spinner"></div></div>;
   if (!product) return (
@@ -47,6 +54,8 @@ export default function ProductDetail() {
     addToCart(product, qty);
     setAddedMsg(true);
     setTimeout(() => setAddedMsg(false), 2000);
+    // Track add-to-cart for AI recommendations
+    trackBehavior(getAIUserId(user), product.id, 'add_to_cart');
   };
 
   return (

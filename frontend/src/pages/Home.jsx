@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, Star, Search, SlidersHorizontal, ArrowRight, X } from 'lucide-react';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { getAIUserId, trackBehavior, behaviorHeaders, trackSearch } from '../utils/aiTracking';
 
 const API = 'http://localhost:8000/api';
 
@@ -18,8 +20,19 @@ export default function Home() {
   const [inStock, setInStock] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const { addToCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const wsRef = useRef(null);
+
+  const handleProductClick = (product) => {
+    trackBehavior(getAIUserId(user), String(product.id), 'view_detail');
+    navigate(`/products/${product.slug}`);
+  };
+
+  const handleAddToCart = (product) => {
+    addToCart(product, 1);
+    trackBehavior(getAIUserId(user), String(product.id), 'add_to_cart');
+  };
 
   // Fetch Categories
   useEffect(() => {
@@ -64,8 +77,15 @@ export default function Home() {
       if (maxPrice) params.append('max_price', maxPrice);
       if (inStock) params.append('in_stock', 'true');
 
-      const res = await axios.get(`${API}/products/?${params}`);
-      setProducts(res.data.results || res.data);
+      const userId = getAIUserId(null);
+      const res = await axios.get(`${API}/products/?${params}`, {
+        headers: behaviorHeaders(userId),
+      });
+      const data = res.data.results || res.data;
+      setProducts(data);
+      if (search) {
+        trackSearch(userId, search, Array.isArray(data) ? data.length : 0);
+      }
     } catch (err) {
       console.warn('Using placeholder products');
       setProducts([]);
@@ -184,14 +204,14 @@ export default function Home() {
                 {product.discount_percent > 0 && (
                   <div className="product-badge">-{product.discount_percent}%</div>
                 )}
-                <div className="product-image-wrap" onClick={() => navigate(`/products/${product.slug}`)} style={{ cursor: 'pointer' }}>
+                <div className="product-image-wrap" onClick={() => handleProductClick(product)} style={{ cursor: 'pointer' }}>
                   <img
                     src={product.image_url || `https://picsum.photos/seed/${product.id}/400/400`}
                     alt={product.name}
                     className="product-image"
                   />
                   <div className="product-action-overlay">
-                    <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); addToCart(product, 1); }} style={{ padding: '8px', flex: 1 }}>
+                    <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }} style={{ padding: '8px', flex: 1 }}>
                       <ShoppingCart size={18} style={{ marginRight: '4px' }} /> Thêm vào giỏ
                     </button>
                     <button className="btn btn-outline" style={{ padding: '8px', width: '42px', height: '42px', display: 'flex', justifyContent: 'center' }}>
@@ -202,7 +222,7 @@ export default function Home() {
                 <div className="product-info">
                   <span className="product-category">{product.category_name || 'Category'}</span>
                   <h3 className="product-name">
-                    <Link to={`/products/${product.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>{product.name}</Link>
+                    <Link to={`/products/${product.slug}`} onClick={() => trackBehavior(getAIUserId(user), String(product.id), 'view_detail')} style={{ color: 'inherit', textDecoration: 'none' }}>{product.name}</Link>
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                     <Star size={14} fill="gold" color="gold" />

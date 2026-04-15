@@ -153,6 +153,30 @@ class OrderCreateView(APIView):
             },
         )
 
+        # Track purchase behavior (fire-and-forget)
+        import threading
+        def _track_purchases():
+            for item in items_data:
+                try:
+                    requests.post(
+                        f'{PRODUCT_SERVICE_URL}/api/analytics/event/',
+                        json={
+                            'user_id': str(d['user_id']),
+                            'session_id': 'order-checkout',
+                            'event_type': 'purchase',
+                            'product_id': str(item['product_id']),
+                            'metadata': {
+                                'quantity': item['quantity'],
+                                'price': str(item['product_price']),
+                                'order_id': str(order.id),
+                            },
+                        },
+                        timeout=3,
+                    )
+                except Exception:
+                    pass
+        threading.Thread(target=_track_purchases, daemon=True).start()
+
         return Response(
             OrderSerializer(order).data,
             status=status.HTTP_201_CREATED,

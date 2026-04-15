@@ -21,26 +21,30 @@ class Command(BaseCommand):
     help = 'Consume order.completed events to confirm orders and commit stock.'
 
     def handle(self, *args, **options):
-        self.stdout.write('[Completed Consumer] Connecting to RabbitMQ...')
-        conn = _get_connection()
-        channel = conn.channel()
-
-        # Ensure the exchange exists
-        channel.exchange_declare(exchange='order.events', exchange_type='topic', durable=True)
-
-        # Declare the queue for completed orders
-        queue_name = 'order.service.completed.queue'
-        channel.queue_declare(queue=queue_name, durable=True)
-        # Bind the queue to the routing key
-        channel.queue_bind(exchange='order.events', queue=queue_name, routing_key='order.completed')
-
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(
-            queue=queue_name,
-            on_message_callback=self._on_completed,
-        )
-        self.stdout.write('[Completed Consumer] Waiting for completed orders...')
-        channel.start_consuming()
+        import time
+        retry = 0
+        while True:
+            try:
+                self.stdout.write(f'[Completed Consumer] Connecting to RabbitMQ... (attempt {retry + 1})')
+                conn = _get_connection()
+                channel = conn.channel()
+                channel.exchange_declare(exchange='order.events', exchange_type='topic', durable=True)
+                queue_name = 'order.service.completed.queue'
+                channel.queue_declare(queue=queue_name, durable=True)
+                channel.queue_bind(exchange='order.events', queue=queue_name, routing_key='order.completed')
+                channel.basic_qos(prefetch_count=1)
+                channel.basic_consume(
+                    queue=queue_name,
+                    on_message_callback=self._on_completed,
+                )
+                self.stdout.write('[Completed Consumer] Waiting for completed orders...')
+                retry = 0
+                channel.start_consuming()
+            except Exception as e:
+                retry += 1
+                wait = min(30, 5 * retry)
+                logger.error(f'[Completed Consumer] Error: {e}. Retrying in {wait}s...')
+                time.sleep(wait)
 
     def _on_completed(self, ch, method, properties, body):
         try:

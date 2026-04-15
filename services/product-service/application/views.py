@@ -1,4 +1,6 @@
 """Product views with Redis stock locking."""
+import logging
+import threading
 import redis
 from rest_framework import viewsets, status
 from rest_framework.permissions import AllowAny
@@ -15,6 +17,69 @@ from .serializers import (
     ProductDetailSerializer,
     ProductCreateUpdateSerializer,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _extract_user_id(request):
+    uid = (
+        request.META.get('HTTP_X_USER_ID')
+        or request.query_params.get('user_id')
+        or request.data.get('user_id')
+    )
+    return str(uid) if uid else None
+
+
+def _extract_session_id(request):
+    return (
+        request.META.get('HTTP_X_SESSION_ID')
+        or request.query_params.get('session_id')
+        or 'anonymous'
+    )
+
+
+def _track_product_view(product_id, user_id, session_id, source='product_detail'):
+    try:
+        from analytics.models import UserProductView
+        import uuid
+        UserProductView.objects.create(
+            product_id=product_id,
+            user_id=uuid.UUID(str(user_id)) if user_id else None,
+            session_id=session_id or 'anonymous',
+            source=source,
+        )
+    except Exception as e:
+        logger.debug(f"[analytics] view track failed: {e}")
+
+
+def _track_search(user_id, session_id, query, results_count, filters=None):
+    try:
+        from analytics.models import UserSearchLog
+        import uuid
+        UserSearchLog.objects.create(
+            user_id=uuid.UUID(str(user_id)) if user_id else None,
+            session_id=session_id or 'anonymous',
+            query=query[:255],
+            results_count=results_count,
+            filters=filters or {},
+        )
+    except Exception as e:
+        logger.debug(f"[analytics] search track failed: {e}")
+
+
+def _track_click_event(user_id, session_id, event_type, product_id, metadata=None):
+    try:
+        from analytics.models import UserClickEvent
+        import uuid
+        UserClickEvent.objects.create(
+            user_id=uuid.UUID(str(user_id)) if user_id else None,
+            session_id=session_id or 'anonymous',
+            event_type=event_type,
+            product_id=uuid.UUID(str(product_id)) if product_id else None,
+            metadata=metadata or {},
+        )
+    except Exception as e:
+        logger.debug(f"[analytics] click track failed: {e}")
 
 
 def _get_redis():
@@ -77,6 +142,37 @@ class ProductViewSet(viewsets.ModelViewSet):
             obj = queryset.get(slug=lookup)
         self.check_object_permissions(self.request, obj)
         return obj
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        user_id = _extract_user_id(request)
+        session_id = _extract_session_id(request)
+        threading.Thread(
+            target=_track_product_view,
+            args=(instance.id, user_id, session_id, 'product_detail'),
+            daemon=True,
+        ).start()
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        search_query = request.query_params.get('search', '').strip()
+        if search_query:
+            user_id = _extract_user_id(request)
+            session_id = _extract_session_id(request)
+            data = response.data
+            results_count = len(data.get('results', data)) if isinstance(data, dict) else len(data)
+            filters = {
+                k: v for k, v in request.query_params.items()
+                if k not in ('search', 'page', 'limit', 'user_id', 'session_id')
+            }
+            threading.Thread(
+                target=_track_search,
+                args=(user_id, session_id, search_query, results_count, filters),
+                daemon=True,
+            ).start()
+        return response
 
     @action(detail=False, methods=['get'])
     def featured(self, request):
