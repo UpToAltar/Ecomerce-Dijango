@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, LogOut, Menu, X, PackageSearch, Bot } from 'lucide-react';
+import { ShoppingCart, LogOut, Menu, X, PackageSearch, Bot, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -31,6 +31,9 @@ export default function Header() {
           {user && <Link to="/orders" className="nav-link">Đơn hàng</Link>}
           <Link to="/ai-chat" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--color-primary)', fontWeight: 600 }}>
             <Bot size={15} /> AI Tư Vấn
+          </Link>
+          <Link to="/ai-recommend" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#f59e0b', fontWeight: 600 }}>
+            <Sparkles size={15} /> AI Recommend
           </Link>
         </nav>
 
@@ -82,6 +85,9 @@ export default function Header() {
           {user && <Link to="/orders" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--color-text)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>Đơn hàng của tôi</Link>}
           <Link to="/ai-chat" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Bot size={16} /> AI Tư Vấn Mua Sắm
+          </Link>
+          <Link to="/ai-recommend" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 600, color: '#f59e0b', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={16} /> AI Recommend
           </Link>
           <Link to="/cart" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--color-text)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between' }}>
             Giỏ hàng <span style={{ background: 'var(--color-primary)', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem' }}>{cartCount}</span>

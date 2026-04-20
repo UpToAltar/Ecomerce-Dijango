@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const AI_TRACK_URL = 'http://localhost:8000/api/ai/track';
+const AI_NEW_TRACK_URL = 'http://localhost:8000/api/ai-new/track';
 const AI_KB_BUILD_URL = 'http://localhost:8008/api/ai/kb/build';
 const ANALYTICS_BASE = 'http://localhost:8000/api/analytics';
 
@@ -35,10 +36,19 @@ export function behaviorHeaders(userId) {
  */
 export function trackBehavior(userId, productId, eventType = 'view_detail') {
   if (!userId || !productId) return;
+  // Track to original ai-service
   axios.post(AI_TRACK_URL, {
     user_id: String(userId),
     product_id: String(productId),
     event_type: eventType,
+  }).catch(() => {});
+  // Also track to ai-new-service (UserBehaviorData table)
+  const actionMap = { view_detail: 'view', add_to_cart: 'add_to_cart', click: 'click', purchase: 'purchase' };
+  const action = actionMap[eventType] || eventType;
+  axios.post(AI_NEW_TRACK_URL, {
+    user_id: String(userId),
+    product_id: String(productId),
+    action: action,
   }).catch(() => {});
 }
 

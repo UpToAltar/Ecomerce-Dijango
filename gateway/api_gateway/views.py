@@ -13,6 +13,7 @@ SERVICE_MAP = {
     'notifications': 'http://notification-service:8000',
     'reviews': 'http://review-service:8000',
     'ai': 'http://ai-service:8000',
+    'ai-new': 'http://ai-new-service:8000',
 }
 
 @method_decorator(csrf_exempt, name='dispatch')
