@@ -2,12 +2,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.config import settings
 from app.knowledge_base.builder import build_documents, fetch_products_with_retry
 from app.rag.embeddings import EmbeddingService
 from app.rag.vector_store import VectorStore
 from app.rag.chat_engine import ChatEngine
 from app.training.trainer import BehaviorTrainer
+from app.graph.graph_store import KnowledgeGraph
 from app.state import app_state
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,18 @@ async def initialize_services() -> None:
     trainer = BehaviorTrainer()
     app_state.trainer = trainer
 
-    chat_engine = ChatEngine(_vector_store)
+    # ── Neo4j Knowledge Graph ──────────────────────────────────────────────
+    graph_store = KnowledgeGraph()
+    connected = graph_store.connect()
+    if connected:
+        app_state.graph_store = graph_store
+        if graph_store.is_ready():
+            app_state.is_graph_ready = True
+            logger.info("Neo4j graph already populated, skipping rebuild.")
+    else:
+        logger.warning("Neo4j not reachable at startup — graph features disabled.")
+
+    chat_engine = ChatEngine(_vector_store, graph_store=app_state.graph_store)
     app_state.chat_engine = chat_engine
 
     if _vector_store.is_ready():
@@ -79,8 +90,47 @@ async def run_startup_pipeline(force_rebuild: bool = False) -> None:
         except Exception as e:
             logger.error(f"KB build failed: {e}")
 
+    # ── Neo4j graph build ──────────────────────────────────────────────────
+    if not app_state.is_graph_ready or force_rebuild:
+        await _build_graph(products)
+
     if not app_state.is_model_ready or force_rebuild:
         await run_training_only()
+
+
+async def _build_graph(products: list) -> None:
+    """Build Neo4j graph in executor to avoid blocking the event loop."""
+    gs = app_state.graph_store
+    if gs is None or not gs.is_connected():
+        logger.info("Skipping Neo4j graph build — not connected.")
+        return
+    try:
+        loop = asyncio.get_event_loop()
+        stats = await loop.run_in_executor(None, gs.build, products)
+        app_state.is_graph_ready = True
+        logger.info(f"Neo4j graph built: {stats}")
+    except Exception as e:
+        logger.error(f"Neo4j graph build failed: {e}")
+
+
+async def run_graph_only() -> None:
+    """Trigger a standalone Neo4j graph rebuild (called from API)."""
+    global _products_cache
+    from app.knowledge_base.builder import fetch_all_products
+    
+    # Always fetch fresh products completely bypassing cache for graph rebuild
+    fresh_products = await fetch_all_products()
+    if not fresh_products:
+        logger.error("No products fetched for graph rebuild.")
+        return
+        
+    _products_cache = fresh_products
+    
+    if app_state.trainer:
+        app_state.trainer.idx_to_product = {i: p for i, p in enumerate(fresh_products)}
+        
+    await _build_graph(fresh_products)
+
 
 
 async def run_training_only() -> None:

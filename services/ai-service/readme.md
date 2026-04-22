@@ -20,6 +20,7 @@ Service không có database riêng. Dữ liệu sản phẩm và hành vi lấy 
 | Deep Learning | PyTorch (CPU) |
 | Embedding | sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`) |
 | Vector Store | ChromaDB (persistent, cosine similarity) |
+| Knowledge Graph | **Neo4j 5 Community** (bolt://neo4j-ai:7687, GUI: 7475) |
 | RAG Framework | LangChain + langchain-core |
 | Cache / Session | Redis (DB 2) |
 | HTTP Client | httpx (async) |
@@ -38,10 +39,14 @@ Service không có database riêng. Dữ liệu sản phẩm và hành vi lấy 
 | WS | `/ws/chat/{session_id}` | Chat real-time (WebSocket) |
 | GET | `/api/ai/recommend/{user_id}` | Gợi ý sản phẩm cá nhân hóa |
 | POST | `/api/ai/track` | Ghi nhận hành vi người dùng |
-| GET | `/api/ai/kb/status` | Trạng thái Knowledge Base |
+| GET | `/api/ai/kb/status` | Trạng thái Knowledge Base (ChromaDB) |
 | POST | `/api/ai/kb/build` | Rebuild KB thủ công |
 | POST | `/api/ai/train` | Kích hoạt train model |
 | GET | `/api/ai/train/status` | Trạng thái / tiến trình train |
+| GET | `/api/ai/graph/status` | Trạng thái Neo4j Knowledge Graph |
+| POST | `/api/ai/graph/build` | Rebuild Neo4j graph thủ công |
+| GET | `/api/ai/graph/explore` | Khám phá subgraph (viewer) |
+| GET | `/api/ai/graph/related` | Sản phẩm liên quan qua graph traversal |
 
 ---
 
@@ -54,13 +59,15 @@ Khi container start, `app/startup.py` chạy pipeline theo thứ tự:
 ```
 1. Load Embedding Model (paraphrase-multilingual-MiniLM-L12-v2)
 2. Khởi tạo ChromaDB Vector Store
-3. Kết nối Redis
-4. Fetch toàn bộ sản phẩm từ product-service (retry 6 lần × 10s)
-5. Build Knowledge Base → index vào ChromaDB
-6. Fetch behavior data từ /api/analytics/behavior/
-7. Nếu model đã có (meta.json) → Load model từ volume
-8. Nếu chưa có → Train NCF + LSTM từ đầu
-9. Rebuild idx_to_product cache từ danh sách sản phẩm mới nhất
+3. Kết nối Neo4j Graph Store (bolt://neo4j-ai:7687)
+4. Kết nối Redis
+5. Fetch toàn bộ sản phẩm từ product-service (retry 8 lần × 10s)
+6. Build Knowledge Base → index vào ChromaDB
+7. Build Knowledge Graph → push nodes/edges vào Neo4j
+8. Fetch behavior data từ /api/analytics/behavior/
+9. Nếu model đã có (meta.json) → Load model từ volume
+10. Nếu chưa có → Train NCF + LSTM từ đầu
+11. Rebuild idx_to_product cache từ danh sách sản phẩm mới nhất
 ```
 
 ---
@@ -531,9 +538,178 @@ curl http://localhost:8000/api/ai/health
 
 ---
 
+## 4. Neo4j Knowledge Graph
+
+> 📄 Code: `app/graph/graph_store.py` — class `KnowledgeGraph`  
+> 📄 Builder: `app/graph/graph_builder.py` — `build_graph()`  
+> 📄 Startup: `app/startup.py` — `_build_graph()`
+
+### Mục tiêu
+
+Neo4j lưu **đồ thị tri thức** quan hệ giữa sản phẩm, danh mục và thương hiệu. Khi người dùng search hoặc request gợi ý, ngoài kết quả từ ChromaDB, AI còn dùng Neo4j để **tìm sản phẩm liên quan theo quan hệ đồ thị** (SIMILAR_TO, IN_CATEGORY, MADE_BY), làm giàu ngữ cảnh phản hồi.
+
+### Graph Model
+
+```
+Nodes:
+  (:Product {id, name, slug, price, brand, category_slug, category_name, rating_avg, sold_count, image_url})
+  (:Category {slug, name})
+  (:Brand {name})
+
+Relationships:
+  (:Product)-[:IN_CATEGORY]->(:Category)
+  (:Product)-[:MADE_BY]->(:Brand)
+  (:Product)-[:SIMILAR_TO {score: 0.0-1.0}]->(:Product)
+```
+
+**SIMILAR_TO** được tạo tự động giữa 2 sản phẩm cùng danh mục nếu:
+- Chênh lệch giá ≤ 35%
+- Chênh lệch rating ≤ 1.0
+- Score = 0.6 × (1 - price_diff%) + 0.4 × (1 - rating_diff/5)
+
+### Xem graph trên Neo4j Browser
+
+**Truy cập:** `http://localhost:7475`  
+**Login:** username `neo4j` / password `neo4jpassword`  
+
+#### Cypher queries để khám phá:
+
+```cypher
+-- Xem tổng quan (Product + Category + Brand + edges)
+MATCH (p:Product)-[r]->(n) RETURN p, r, n LIMIT 50
+
+-- Xem đồ thị của 1 danh mục cụ thể
+MATCH (p:Product)-[:IN_CATEGORY]->(c:Category {slug: 'dien-thoai'})
+RETURN p, c LIMIT 30
+
+-- Xem sản phẩm tương tự SIMILAR_TO
+MATCH (a:Product)-[r:SIMILAR_TO]->(b:Product)
+RETURN a.name, b.name, r.score
+ORDER BY r.score DESC LIMIT 20
+
+-- Xem sản phẩm của 1 thương hiệu
+MATCH (p:Product)-[:MADE_BY]->(b:Brand {name: 'Apple'})
+RETURN p.name, p.price, p.rating_avg
+ORDER BY p.rating_avg DESC
+
+-- Đếm node và relationship
+MATCH (n) RETURN labels(n)[0] AS label, count(n) AS count
+UNION
+MATCH ()-[r]->() RETURN type(r) AS label, count(r) AS count
+
+-- Path 2-hop: sản phẩm cùng danh mục với sản phẩm X
+MATCH (p:Product {id: 'PRODUCT_ID'})-[:IN_CATEGORY]->(c)<-[:IN_CATEGORY]-(related)
+RETURN p, c, related LIMIT 20
+```
+
+### API Graph endpoints
+
+```bash
+# Kiểm tra trạng thái graph
+curl http://localhost:8008/api/ai/graph/status
+# → {"is_ready":true,"is_connected":true,"products":115,"categories":10,"brands":25,"similar_edges":340}
+
+# Rebuild graph thủ công (background)
+curl -X POST http://localhost:8008/api/ai/graph/build
+
+# Khám phá subgraph của 1 danh mục (trả JSON nodes + relationships)
+curl "http://localhost:8008/api/ai/graph/explore?type=category&id=dien-thoai&limit=30"
+
+# Khám phá subgraph của 1 product
+curl "http://localhost:8008/api/ai/graph/explore?type=product&id=<PRODUCT_UUID>"
+
+# Khám phá subgraph của 1 brand
+curl "http://localhost:8008/api/ai/graph/explore?type=brand&id=Apple&limit=20"
+
+# Lấy sản phẩm liên quan trực tiếp (SIMILAR_TO + same category)
+curl "http://localhost:8008/api/ai/graph/related?product_id=<PRODUCT_UUID>&limit=5"
+```
+
+### Tích hợp vào Chat (Graph Enrichment)
+
+Khi `intent=search` hoặc `intent=recommend`, sau khi ChromaDB trả kết quả:
+
+```
+ChromaDB top result (product_id)
+          ↓
+Neo4j: MATCH (p:Product {id})-[:SIMILAR_TO | IN_CATEGORY]->(related)
+          ↓
+Lọc bỏ sản phẩm đã hiển thị
+          ↓
+Append section "🔗 Sản phẩm liên quan (theo đồ thị tri thức)"
+```
+
+Nếu Neo4j không kết nối được → graceful fallback, chỉ trả kết quả ChromaDB như cũ.
+
+### Rebuild Graph
+
+```bash
+# Trigger qua API (khuyến nghị sau khi seed/update sản phẩm)
+curl -X POST http://localhost:8000/api/ai/graph/build
+
+# Kiểm tra sau khi rebuild
+curl http://localhost:8000/api/ai/graph/status
+```
+
+---
+
+## Hướng dẫn vận hành
+
+### Seed dữ liệu ban đầu
+
+> 📄 Code seed sản phẩm: `services/product-service/domain/management/commands/seed_products.py`
+> 📄 Code seed hành vi: `services/product-service/domain/management/commands/seed_behavior.py`
+
+```bash
+# Seed sản phẩm (10 categories, 115+ sản phẩm)
+docker compose exec product-service python manage.py seed_products
+
+# Seed hành vi giả lập (500 users, 20.000+ interactions)
+docker compose exec product-service python manage.py seed_behavior
+```
+
+### Train lại model
+
+```bash
+# Trigger qua API
+curl -X POST http://localhost:8000/api/ai/train
+
+# Theo dõi tiến trình
+curl http://localhost:8000/api/ai/train/status
+```
+
+### Rebuild Knowledge Base (ChromaDB)
+
+```bash
+curl -X POST http://localhost:8000/api/ai/kb/build
+
+# Kiểm tra trạng thái
+curl http://localhost:8000/api/ai/kb/status
+```
+
+### Rebuild Knowledge Graph (Neo4j)
+
+```bash
+curl -X POST http://localhost:8000/api/ai/graph/build
+
+# Kiểm tra trạng thái
+curl http://localhost:8000/api/ai/graph/status
+```
+
+### Kiểm tra health
+
+```bash
+curl http://localhost:8000/api/ai/health
+# → {"status":"ok","kb_ready":true,"model_ready":true,"total_products":115}
+```
+
+---
+
 ## Docker Volumes
 
 | Volume | Mount point | Nội dung |
 |---|---|---|
 | `ai_models` | `/app/data/models/` | `ncf.pt`, `seq.pt`, `meta.json` |
 | `ai_chromadb` | `/app/data/chromadb/` | ChromaDB HNSW index |
+| `neo4j_ai_data` | `/data` (container `neo4j-ai`) | Neo4j graph database (chỉ riêng ai-service) |
+

@@ -13,6 +13,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for product listing."""
     category_name = serializers.CharField(source='category.name', read_only=True)
+    category_slug = serializers.CharField(source='category.slug', read_only=True)
     discount_percent = serializers.ReadOnlyField()
     is_in_stock = serializers.ReadOnlyField()
     stock_quantity = serializers.ReadOnlyField(source='available_stock')
@@ -21,7 +22,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'name', 'slug', 'price', 'compare_price',
-            'image_url', 'category_name', 'brand', 'stock_quantity',
+            'image_url', 'category_slug', 'category_name', 'brand', 'stock_quantity',
             'sold_count', 'rating_avg', 'rating_count',
             'discount_percent', 'is_in_stock', 'is_active', 'created_at',
         ]

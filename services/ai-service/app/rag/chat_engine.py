@@ -2,12 +2,15 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import redis.asyncio as aioredis
 
 from app.config import settings
 from app.rag.vector_store import VectorStore
+
+if TYPE_CHECKING:
+    from app.graph.graph_store import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +230,14 @@ def _product_card(meta: dict[str, Any], idx: int) -> str:
 class ChatEngine:
     """RAG-based chat engine with conversation memory and product recommendations."""
 
-    def __init__(self, vector_store: VectorStore, redis_url: str | None = None) -> None:
+    def __init__(
+        self,
+        vector_store: VectorStore,
+        redis_url: str | None = None,
+        graph_store: "KnowledgeGraph | None" = None,
+    ) -> None:
         self.vs = vector_store
+        self.gs = graph_store
         self._redis_url = redis_url or f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
         self._redis: aioredis.Redis | None = None
 
@@ -274,6 +283,41 @@ class ChatEngine:
             return await r.lrange(f"behavior:{user_id}", 0, 49)
         except Exception:
             return []
+
+    def _enrich_with_graph(self, chroma_results: list[dict], limit: int = 3) -> list[dict]:
+        """
+        Given ChromaDB results, use Neo4j to find related products (SIMILAR_TO / same category)
+        for the top result. Returns a deduplicated list of extra product metadata dicts.
+        """
+        if not self.gs or not self.gs.is_ready():
+            return []
+        if not chroma_results:
+            return []
+
+        # Use the top hit's product id
+        top_meta = chroma_results[0].get("metadata", {})
+        product_id = str(top_meta.get("id", ""))
+        if not product_id:
+            return []
+
+        # IDs already shown via ChromaDB
+        shown_ids = {str(r.get("metadata", {}).get("id", "")) for r in chroma_results}
+
+        extras: list[dict] = []
+        try:
+            related = self.gs.get_related_products(product_id, limit=limit * 2)
+            for p in related:
+                pid = str(p.get("id", ""))
+                if pid and pid not in shown_ids:
+                    extras.append(p)
+                    shown_ids.add(pid)
+                if len(extras) >= limit:
+                    break
+        except Exception as e:
+            logger.warning(f"Graph enrichment error: {e}")
+
+        return extras
+
 
     async def chat(
         self,
@@ -338,6 +382,15 @@ class ChatEngine:
         for i, r in enumerate(results, 1):
             lines.append(_product_card(r["metadata"], i))
             lines.append("")
+
+        # ── Graph enrichment: related products via Neo4j ───────────────────
+        graph_extras = self._enrich_with_graph(results)
+        if graph_extras:
+            lines.append("\n🔗 **Sản phẩm liên quan (theo đồ thị tri thức):**\n")
+            for i, meta in enumerate(graph_extras, 1):
+                lines.append(_product_card(meta, i))
+                lines.append("")
+
         lines.append("💬 Bạn có muốn tôi tư vấn thêm về sản phẩm nào không?")
         return "\n".join(lines), results
 
@@ -513,6 +566,14 @@ class ChatEngine:
         for i, r in enumerate(sorted_results, 1):
             lines.append(_product_card(r["metadata"], i))
             lines.append("")
+
+        # ── Graph enrichment ───────────────────────────────────────────────
+        graph_extras = self._enrich_with_graph(sorted_results)
+        if graph_extras:
+            lines.append("\n🔗 **Gợi ý thêm từ đồ thị tri thức:**\n")
+            for i, meta in enumerate(graph_extras, 1):
+                lines.append(_product_card(meta, i))
+                lines.append("")
 
         if category_slug:
             from app.knowledge_base.faq_data import CATEGORY_ADVICE

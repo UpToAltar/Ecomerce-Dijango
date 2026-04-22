@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/data/models /app/data/chromadb
+RUN mkdir -p /app/data/models /app/data/chromadb /app/data/neo4j_graph
 
 EXPOSE 8000
 

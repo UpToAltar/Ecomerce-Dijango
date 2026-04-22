@@ -374,6 +374,9 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=2
       - DATA_DIR=/app/data
+      - NEO4J_URI=bolt://neo4j-ai:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=neo4jpassword
     volumes:
       - ai_models:/app/data/models
       - ai_chromadb:/app/data/chromadb
@@ -382,6 +385,27 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      neo4j-ai:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  neo4j-ai:
+    image: neo4j:5-community
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: neo4j/neo4jpassword
+      NEO4J_PLUGINS: '[]'
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - neo4j_ai_data:/data
     networks:
       - app-network
 
@@ -502,3 +526,4 @@ volumes:
   ai_new_plots:
   ai_new_chromadb:
   neo4j_data:
+  neo4j_ai_data:

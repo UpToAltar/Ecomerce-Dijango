@@ -50,3 +50,32 @@ class HealthResponse(BaseModel):
     model_ready: bool
     training_status: str
     total_products: int
+
+
+class GraphStatusResponse(BaseModel):
+    is_ready: bool
+    is_connected: bool
+    products: int = 0
+    categories: int = 0
+    brands: int = 0
+    similar_edges: int = 0
+    total_nodes: int = 0
+
+
+class GraphNode(BaseModel):
+    id: str
+    labels: list[str]
+    properties: dict
+
+
+class GraphRelationship(BaseModel):
+    id: str
+    type: str
+    start: str
+    end: str
+    properties: dict
+
+
+class GraphExploreResponse(BaseModel):
+    nodes: list[GraphNode]
+    relationships: list[GraphRelationship]

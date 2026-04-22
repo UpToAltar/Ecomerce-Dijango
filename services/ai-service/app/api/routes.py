@@ -16,6 +16,8 @@ from app.api.schemas import (
     TrackBehaviorRequest,
     TrainRequest,
     TrainResponse,
+    GraphStatusResponse,
+    GraphExploreResponse,
 )
 from app.state import app_state
 
@@ -366,3 +368,65 @@ async def training_status():
         "model_ready": app_state.is_model_ready,
         "behaviors_used": app_state.total_behaviors,
     }
+
+
+# ─── Neo4j Knowledge Graph ────────────────────────────────────────────────────
+
+@router.get("/api/ai/graph/status", response_model=GraphStatusResponse)
+async def graph_status():
+    gs = app_state.graph_store
+    connected = gs is not None and gs.is_connected()
+    if not connected:
+        return GraphStatusResponse(
+            is_ready=False,
+            is_connected=False,
+        )
+    stats = gs.stats()
+    return GraphStatusResponse(
+        is_ready=app_state.is_graph_ready,
+        is_connected=True,
+        products=stats.get("products", 0),
+        categories=stats.get("categories", 0),
+        brands=stats.get("brands", 0),
+        similar_edges=stats.get("similar_edges", 0),
+        total_nodes=stats.get("total_nodes", 0),
+    )
+
+
+@router.post("/api/ai/graph/build")
+async def rebuild_graph(background_tasks: BackgroundTasks):
+    from app.startup import run_graph_only
+    background_tasks.add_task(run_graph_only)
+    return {"status": "started", "message": "Neo4j graph rebuild started in background."}
+
+
+@router.get("/api/ai/graph/explore", response_model=GraphExploreResponse)
+async def explore_graph(
+    type: str = "category",   # product | category | brand
+    id: str = "",
+    limit: int = 30,
+):
+    """
+    Return a JSON subgraph (nodes + relationships) for the given node.
+    Useful for reading data to visualise in Neo4j Browser or a custom UI.
+    """
+    gs = app_state.graph_store
+    if gs is None or not gs.is_connected():
+        raise HTTPException(status_code=503, detail="Neo4j not connected.")
+    if not id:
+        raise HTTPException(status_code=400, detail="'id' query parameter is required.")
+    subgraph = gs.explore_node(node_type=type, node_id=id, limit=limit)
+    return GraphExploreResponse(
+        nodes=subgraph.get("nodes", []),
+        relationships=subgraph.get("relationships", []),
+    )
+
+
+@router.get("/api/ai/graph/related")
+async def related_products(product_id: str, limit: int = 5):
+    """Return products related to `product_id` via Neo4j graph traversal."""
+    gs = app_state.graph_store
+    if gs is None or not gs.is_connected():
+        raise HTTPException(status_code=503, detail="Neo4j not connected.")
+    products = gs.get_related_products(product_id, limit=limit)
+    return {"product_id": product_id, "related": products}
