@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, LogOut, Menu, X, PackageSearch, Bot, Sparkles } from 'lucide-react';
+import { ShoppingCart, LogOut, Menu, X, PackageSearch, Bot, Sparkles, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -29,6 +29,9 @@ export default function Header() {
         <nav className="nav-links desktop-only">
           <Link to="/" className="nav-link">Sản phẩm</Link>
           {user && <Link to="/orders" className="nav-link">Đơn hàng</Link>}
+          <Link to="/tracking" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Truck size={15} /> Tra cứu vận đơn
+          </Link>
           <Link to="/ai-chat" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--color-primary)', fontWeight: 600 }}>
             <Bot size={15} /> AI Tư Vấn
           </Link>
@@ -83,6 +86,9 @@ export default function Header() {
         <div style={{ position: 'absolute', top: 'var(--header-height)', left: 0, right: 0, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 90, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
           <Link to="/" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--color-text)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>Sản phẩm</Link>
           {user && <Link to="/orders" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--color-text)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>Đơn hàng của tôi</Link>}
+          <Link to="/tracking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--color-text)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Truck size={16} /> Tra cứu vận đơn
+          </Link>
           <Link to="/ai-chat" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Bot size={16} /> AI Tư Vấn Mua Sắm
           </Link>

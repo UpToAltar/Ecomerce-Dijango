@@ -45,11 +45,13 @@ export function trackBehavior(userId, productId, eventType = 'view_detail') {
   // Also track to ai-new-service (UserBehaviorData table)
   const actionMap = { view_detail: 'view', add_to_cart: 'add_to_cart', click: 'click', purchase: 'purchase' };
   const action = actionMap[eventType] || eventType;
+  /* 
   axios.post(AI_NEW_TRACK_URL, {
     user_id: String(userId),
     product_id: String(productId),
     action: action,
   }).catch(() => {});
+  */
 }
 
 /**

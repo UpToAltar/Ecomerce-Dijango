@@ -14,4 +14,5 @@ urlpatterns = [
     path('internal/products/<uuid:product_id>/lock-stock/', views.LockStockView.as_view(), name='lock_stock'),
     path('internal/products/<uuid:product_id>/commit-stock/', views.CommitStockView.as_view(), name='commit_stock'),
     path('internal/products/<uuid:product_id>/release-stock/', views.ReleaseStockDelockView.as_view(), name='release_stock'),
+    path('internal/products/<uuid:product_id>/update-rating/', views.UpdateRatingView.as_view(), name='update_rating'),
 ]

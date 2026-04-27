@@ -1,28 +1,26 @@
 import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1')
 ALLOWED_HOSTS = ['*']
+
 INSTALLED_APPS = [
     'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles',
     'rest_framework', 'corsheaders', 'domain', 'application',
 ]
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware', 'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware', 'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
 ]
+
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
-DATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': 'review_db', 'USER': os.environ.get('DB_USER', 'admin'), 'PASSWORD': os.environ.get('DB_PASSWORD', 'changeme'), 'HOST': os.environ.get('DB_HOST', 'postgres-review'), 'PORT': os.environ.get('DB_PORT', '5432')}}
-CORS_ALLOW_ALL_ORIGINS = True
-REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.AllowAny',),
-}
-TIME_ZONE = 'Asia/Ho_Chi_Minh'
-USE_TZ = True
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -38,6 +36,32 @@ TEMPLATES = [
         },
     },
 ]
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'shipping_db',
+        'USER': os.environ.get('DB_USER', 'admin'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'changeme'),
+        'HOST': os.environ.get('DB_HOST', 'postgres-shipping'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+    }
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.AllowAny',),
+}
+
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+RABBITMQ_PORT = int(os.environ.get('RABBITMQ_PORT', 5672))
+RABBITMQ_USER = os.environ.get('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'guest')
+
+ORDER_SERVICE_URL = os.environ.get('ORDER_SERVICE_URL', 'http://order-service:8000')
+
+CORS_ALLOW_ALL_ORIGINS = True
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-PRODUCT_SERVICE_URL = os.environ.get('PRODUCT_SERVICE_URL', 'http://product-service:8000')
+TIME_ZONE = 'Asia/Ho_Chi_Minh'
+USE_TZ = True

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Star, ChevronLeft, Package, Truck, Shield } from 'lucide-react';
+import { ShoppingCart, Star, ChevronLeft, Package, Truck, Shield, Send, User, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,17 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [addedMsg, setAddedMsg] = useState(false);
+
+  // Review states
+  const [reviews, setReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
+  const [hoverRating, setHoverRating] = useState(0);
 
   useEffect(() => {
     const fetch = async () => {
@@ -38,6 +49,70 @@ export default function ProductDetail() {
     fetch();
   }, [slug, user]);
 
+  // Fetch reviews when product is loaded
+  useEffect(() => {
+    if (!product?.id) return;
+    const fetchReviews = async () => {
+      setReviewLoading(true);
+      try {
+        const [reviewsRes, statsRes] = await Promise.all([
+          axios.get(`${API}/reviews/?product_id=${product.id}`),
+          axios.get(`${API}/reviews/product/${product.id}/stats/`),
+        ]);
+        setReviews(reviewsRes.data);
+        setReviewStats(statsRes.data);
+      } catch (err) {
+        console.error('Fetch reviews error', err);
+      } finally {
+        setReviewLoading(false);
+      }
+    };
+    fetchReviews();
+  }, [product?.id]);
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      setReviewError('Vui lòng đăng nhập để đánh giá sản phẩm.');
+      return;
+    }
+    setReviewError('');
+    setReviewSuccess('');
+    setReviewSubmitting(true);
+    try {
+      const res = await axios.post(`${API}/reviews/create/`, {
+        product_id: product.id,
+        user_id: user.id,
+        user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+        rating: newRating,
+        comment: newComment,
+      });
+      setReviews([res.data, ...reviews]);
+      setReviewSuccess('Cảm ơn bạn đã đánh giá!');
+      setNewComment('');
+      setNewRating(5);
+      // Refresh stats
+      const statsRes = await axios.get(`${API}/reviews/product/${product.id}/stats/`);
+      setReviewStats(statsRes.data);
+    } catch (err) {
+      setReviewError(err.response?.data?.error || 'Có lỗi xảy ra khi gửi đánh giá.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) return;
+    try {
+      await axios.delete(`${API}/reviews/${reviewId}/`);
+      setReviews(reviews.filter(r => r.id !== reviewId));
+      const statsRes = await axios.get(`${API}/reviews/product/${product.id}/stats/`);
+      setReviewStats(statsRes.data);
+    } catch (err) {
+      alert('Xóa đánh giá thất bại');
+    }
+  };
+
   if (loading) return <div className="loader-container" style={{ minHeight: '60vh' }}><div className="spinner"></div></div>;
   if (!product) return (
     <div className="container" style={{ padding: '80px 20px', textAlign: 'center' }}>
@@ -54,9 +129,10 @@ export default function ProductDetail() {
     addToCart(product, qty);
     setAddedMsg(true);
     setTimeout(() => setAddedMsg(false), 2000);
-    // Track add-to-cart for AI recommendations
     trackBehavior(getAIUserId(user), product.id, 'add_to_cart');
   };
+
+  const userAlreadyReviewed = user && reviews.some(r => r.user_id === user.id);
 
   return (
     <div className="container" style={{ padding: '40px 20px' }}>
@@ -100,10 +176,12 @@ export default function ProductDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex' }}>
               {[1,2,3,4,5].map(i => (
-                <Star key={i} size={16} fill={i <= Math.round(product.rating_avg) ? 'gold' : 'transparent'} color={i <= Math.round(product.rating_avg) ? 'gold' : '#ccc'} />
+                <Star key={i} size={16} fill={i <= Math.round(reviewStats?.rating_avg || product.rating_avg) ? 'gold' : 'transparent'} color={i <= Math.round(reviewStats?.rating_avg || product.rating_avg) ? 'gold' : '#ccc'} />
               ))}
             </div>
-            <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>{product.rating_avg} ({product.rating_count} đánh giá)</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
+              {Number(reviewStats?.rating_avg || product.rating_avg || 0).toFixed(1)} ({reviewStats?.rating_count || product.rating_count || 0} đánh giá)
+            </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
@@ -117,7 +195,7 @@ export default function ProductDetail() {
           </div>
 
           <div style={{ padding: '12px 16px', borderRadius: '10px', background: product.stock_quantity > 0 ? '#dcfce7' : '#fee2e2', color: product.stock_quantity > 0 ? '#16a34a' : '#dc2626', fontWeight: 600, fontSize: '0.9rem' }}>
-            {product.stock_quantity > 0 ? `✓ Còn ${product.stock_quantity} sản phẩm` : '✗ Hết hàng'}
+            {product.stock_quantity > 0 ? `Còn ${product.stock_quantity} sản phẩm` : 'Hết hàng'}
           </div>
 
           <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.7, margin: 0 }}>{product.description}</p>
@@ -136,7 +214,7 @@ export default function ProductDetail() {
               disabled={!product.is_in_stock}
             >
               <ShoppingCart size={20} />
-              {addedMsg ? '✓ Đã thêm!' : 'Thêm vào giỏ'}
+              {addedMsg ? 'Đã thêm!' : 'Thêm vào giỏ'}
             </button>
           </div>
 
@@ -171,6 +249,154 @@ export default function ProductDetail() {
           </table>
         </div>
       )}
+
+      {/* ─── Reviews Section ─── */}
+      <div className="product-card" style={{ marginTop: '40px', padding: '28px' }}>
+        <h3 style={{ marginBottom: '24px', fontSize: '1.3rem' }}>Đánh giá sản phẩm</h3>
+
+        {/* Stats summary */}
+        {reviewStats && (
+          <div style={{ display: 'flex', gap: '32px', marginBottom: '28px', padding: '20px', background: 'var(--color-surface-elevated)', borderRadius: '12px' }}>
+            <div style={{ textAlign: 'center', minWidth: '120px' }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                {Number(reviewStats.rating_avg || 0).toFixed(1)}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
+                {[1,2,3,4,5].map(i => (
+                  <Star key={i} size={14} fill={i <= Math.round(reviewStats.rating_avg) ? 'gold' : 'transparent'} color={i <= Math.round(reviewStats.rating_avg) ? 'gold' : '#ccc'} />
+                ))}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{reviewStats.rating_count} đánh giá</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              {[5,4,3,2,1].map(star => {
+                const count = reviewStats.distribution?.[star] || 0;
+                const pct = reviewStats.rating_count > 0 ? (count / reviewStats.rating_count) * 100 : 0;
+                return (
+                  <div key={star} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.8rem', width: '16px', textAlign: 'right', color: 'var(--color-text-muted)' }}>{star}</span>
+                    <Star size={12} fill="gold" color="gold" />
+                    <div style={{ flex: 1, height: '8px', background: 'var(--color-border)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: '#facc15', borderRadius: '4px', transition: 'width 0.3s' }}></div>
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', width: '28px' }}>{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Write review form */}
+        {user && !userAlreadyReviewed && (
+          <form onSubmit={handleSubmitReview} style={{ marginBottom: '28px', padding: '20px', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
+            <h4 style={{ marginBottom: '16px', fontSize: '1rem' }}>Viết đánh giá của bạn</h4>
+            {/* Star picker */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '0.9rem', marginRight: '8px', color: 'var(--color-text-secondary)' }}>Xếp hạng:</span>
+              {[1,2,3,4,5].map(i => (
+                <Star
+                  key={i}
+                  size={24}
+                  fill={(hoverRating || newRating) >= i ? 'gold' : 'transparent'}
+                  color={(hoverRating || newRating) >= i ? 'gold' : '#ccc'}
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoverRating(i)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setNewRating(i)}
+                />
+              ))}
+              <span style={{ marginLeft: '8px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{newRating}/5</span>
+            </div>
+            <textarea
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
+              style={{
+                width: '100%', minHeight: '80px', padding: '12px', borderRadius: '8px',
+                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+            {reviewError && <div style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: '8px' }}>{reviewError}</div>}
+            {reviewSuccess && <div style={{ color: '#16a34a', fontSize: '0.85rem', marginTop: '8px' }}>{reviewSuccess}</div>}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={reviewSubmitting}
+              style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}
+            >
+              <Send size={16} />
+              {reviewSubmitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+            </button>
+          </form>
+        )}
+
+        {!user && (
+          <div style={{ marginBottom: '24px', padding: '16px', background: '#fef3c7', borderRadius: '8px', color: '#b45309', fontSize: '0.9rem' }}>
+            Vui lòng <a href="/login" style={{ fontWeight: 600, color: '#b45309' }}>đăng nhập</a> để viết đánh giá.
+          </div>
+        )}
+
+        {userAlreadyReviewed && (
+          <div style={{ marginBottom: '24px', padding: '16px', background: '#dcfce7', borderRadius: '8px', color: '#16a34a', fontSize: '0.9rem' }}>
+            Bạn đã đánh giá sản phẩm này. Cảm ơn bạn!
+          </div>
+        )}
+
+        {/* Review list */}
+        {reviewLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Đang tải đánh giá...</div>
+        ) : reviews.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text-muted)' }}>
+            Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá sản phẩm này!
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {reviews.map(review => (
+              <div key={review.id} style={{ padding: '16px', border: '1px solid var(--color-border)', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '50%',
+                      background: 'var(--gradient-primary)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.85rem',
+                    }}>
+                      {(review.user_name?.[0] || 'U').toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{review.user_name || 'Người dùng'}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex' }}>
+                      {[1,2,3,4,5].map(i => (
+                        <Star key={i} size={14} fill={i <= review.rating ? 'gold' : 'transparent'} color={i <= review.rating ? 'gold' : '#ccc'} />
+                      ))}
+                    </div>
+                    {user && review.user_id === user.id && (
+                      <button
+                        onClick={() => handleDeleteReview(review.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '4px', display: 'flex' }}
+                        title="Xóa đánh giá"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {review.comment && (
+                  <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.6, fontSize: '0.9rem' }}>{review.comment}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

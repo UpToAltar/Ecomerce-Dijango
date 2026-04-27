@@ -15,6 +15,7 @@ import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import AIChat from './pages/AIChat';
 import AINewRecommend from './pages/AINewRecommend';
+import TrackShipment from './pages/TrackShipment';
 
 function AppContent() {
   const location = useLocation();
@@ -39,6 +40,7 @@ function AppContent() {
             <Route path="/payment-result" element={<PaymentResult />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
+            <Route path="/tracking" element={<TrackShipment />} />
             <Route path="/ai-chat" element={<AIChat />} />
             <Route path="/ai-recommend" element={<AINewRecommend />} />
           </Routes>

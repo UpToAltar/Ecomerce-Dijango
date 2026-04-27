@@ -191,10 +191,43 @@ CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY,
     product_id UUID NOT NULL,
     user_id UUID NOT NULL,
+    user_name VARCHAR(200) DEFAULT '' NOT NULL,
     rating INTEGER NOT NULL,
-    comment TEXT NOT NULL,
+    comment TEXT DEFAULT '' NOT NULL,
     is_approved BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE (product_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS reviews_product_id_idx ON reviews (product_id);
+CREATE INDEX IF NOT EXISTS reviews_user_id_idx ON reviews (user_id);
+
+-------------------------------------------------------------------------------
+-- SHIPPING SERVICE
+-------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS shipments (
+    id UUID PRIMARY KEY,
+    order_id UUID UNIQUE NOT NULL,
+    order_number VARCHAR(20) DEFAULT '' NOT NULL,
+    carrier VARCHAR(100) DEFAULT 'Shop Delivery' NOT NULL,
+    tracking_number VARCHAR(100) DEFAULT '' NOT NULL,
+    status VARCHAR(30) DEFAULT 'pending' NOT NULL,
+    shipping_address JSONB DEFAULT '{}'::jsonb NOT NULL,
+    estimated_delivery TIMESTAMP WITH TIME ZONE,
+    actual_delivery TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS shipping_tracking_events (
+    id UUID PRIMARY KEY,
+    shipment_id UUID NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL,
+    location VARCHAR(255) DEFAULT '' NOT NULL,
+    note TEXT DEFAULT '' NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS shipments_order_id_idx ON shipments (order_id);
+CREATE INDEX IF NOT EXISTS shipping_tracking_events_shipment_id_idx ON shipping_tracking_events (shipment_id);

@@ -15,6 +15,7 @@ from infrastructure.rabbitmq import publish_order_expiry, publish_event
 
 PRODUCT_SERVICE_URL = getattr(settings, 'PRODUCT_SERVICE_URL', 'http://product-service:8000')
 PAYMENT_SERVICE_URL = getattr(settings, 'PAYMENT_SERVICE_URL', 'http://payment-service:8000')
+SHIPPING_SERVICE_URL = getattr(settings, 'SHIPPING_SERVICE_URL', 'http://shipping-service:8000')
 
 
 class OrderListView(APIView):
@@ -226,8 +227,29 @@ class OrderStatusUpdateView(APIView):
 
         serializer = OrderStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        order.status = serializer.validated_data['status']
+        new_status = serializer.validated_data['status']
+        order.status = new_status
         order.save()
+
+        # Auto-create shipment when order moves to 'shipping'
+        if new_status == 'shipping':
+            import threading
+            def _create_shipment():
+                try:
+                    requests.post(
+                        f'{SHIPPING_SERVICE_URL}/api/shipping/create/',
+                        json={
+                            'order_id': str(order.id),
+                            'order_number': order.order_number,
+                            'shipping_address': order.shipping_address,
+                        },
+                        timeout=5,
+                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f'[OrderStatusUpdate] create shipment failed: {e}')
+            threading.Thread(target=_create_shipment, daemon=True).start()
+
         return Response(OrderSerializer(order).data)
 
 

@@ -255,6 +255,32 @@ class CommitStockView(APIView):
             r.delete(lock_key)
 
 
+class UpdateRatingView(APIView):
+    """POST /internal/products/<product_id>/update-rating/
+    Called by review-service to sync rating_avg and rating_count.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, product_id):
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+
+        rating_avg = request.data.get('rating_avg', 0)
+        rating_count = request.data.get('rating_count', 0)
+
+        product.rating_avg = rating_avg
+        product.rating_count = rating_count
+        product.save(update_fields=['rating_avg', 'rating_count', 'updated_at'])
+
+        return Response({
+            'success': True,
+            'rating_avg': float(product.rating_avg),
+            'rating_count': product.rating_count,
+        })
+
+
 class ReleaseStockDelockView(APIView):
     """POST /internal/products/<product_id>/release-stock/
     Releases Redis lock without changing DB.
