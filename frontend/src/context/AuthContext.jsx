@@ -31,10 +31,10 @@ export const AuthProvider = ({ children }) => {
       const userObj = userData || { email, role: 'customer', id: 'dummy-id' };
       localStorage.setItem('user_data', JSON.stringify(userObj));
       setUser(userObj);
-      return true;
+      return userObj;
     } catch (err) {
       console.error('Login failed', err);
-      return false;
+      return null;
     }
   };
 

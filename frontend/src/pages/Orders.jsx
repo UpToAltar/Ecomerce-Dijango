@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Package, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API = 'http://localhost:8000/api';
@@ -50,6 +50,8 @@ export default function Orders() {
     switch(status?.toLowerCase()) {
       case 'pending': return { text: 'Chờ xử lý', color: '#eab308', icon: <Clock size={16} /> };
       case 'confirmed': return { text: 'Đã xác nhận', color: '#3b82f6', icon: <Package size={16} /> };
+      case 'shipping': return { text: 'Đang giao', color: '#f59e0b', icon: <Truck size={16} /> };
+      case 'delivered': 
       case 'completed': return { text: 'Hoàn thành', color: '#16a34a', icon: <CheckCircle size={16} /> };
       case 'cancelled': return { text: 'Đã huỷ', color: '#dc2626', icon: <XCircle size={16} /> };
       default: return { text: status, color: '#6b7280', icon: <Clock size={16} /> };

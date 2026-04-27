@@ -10,8 +10,9 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
     UserAdminSerializer,
+    CreateStaffSerializer,
 )
-from .permissions import IsAdmin
+from .permissions import IsAdmin, IsStaffOrAdmin
 
 
 class RegisterView(generics.CreateAPIView):
@@ -72,12 +73,65 @@ class UserListView(generics.ListAPIView):
         return qs
 
 
-class UserDetailView(generics.RetrieveUpdateAPIView):
-    """GET/PUT /api/auth/users/<id>/ — Manage a user (admin only)."""
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PUT/DELETE /api/auth/users/<id>/ — Manage a user (admin only)."""
     serializer_class = UserAdminSerializer
     permission_classes = [IsAdmin]
     queryset = User.objects.all()
     lookup_field = 'id'
+
+
+class CreateStaffView(APIView):
+    """POST /api/auth/users/create-staff/ — Admin creates a staff user."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        serializer = CreateStaffSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        d = serializer.validated_data
+        if User.objects.filter(email=d['email']).exists():
+            return Response({'error': 'Email already exists'}, status=400)
+        user = User.objects.create_user(
+            email=d['email'],
+            password=d['password'],
+            first_name=d.get('first_name', ''),
+            last_name=d.get('last_name', ''),
+            phone=d.get('phone', ''),
+            role=User.Role.STAFF,
+            is_staff=True,
+        )
+        return Response(UserAdminSerializer(user).data, status=201)
+
+
+class UpdateUserStatusView(APIView):
+    """PUT /api/auth/users/<id>/status/ — Activate or deactivate user."""
+    permission_classes = [IsAdmin]
+
+    def put(self, request, id):
+        try:
+            user = User.objects.get(id=id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        is_active = request.data.get('is_active')
+        if is_active is None:
+            return Response({'error': 'is_active required'}, status=400)
+        user.is_active = bool(is_active)
+        user.save(update_fields=['is_active'])
+        return Response(UserAdminSerializer(user).data)
+
+
+class AdminUserStatsView(APIView):
+    """GET /api/auth/users/stats/ — User counts by role."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Count
+        counts = User.objects.values('role').annotate(count=Count('id'))
+        result = {item['role']: item['count'] for item in counts}
+        return Response({
+            'total': User.objects.count(),
+            'by_role': result,
+        })
 
 
 class ValidateTokenView(APIView):

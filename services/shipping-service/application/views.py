@@ -209,3 +209,19 @@ class TrackByTrackingNumberView(APIView):
             return Response(ShipmentSerializer(shipment).data)
         except Shipment.DoesNotExist:
             return Response({'error': 'Tracking number not found'}, status=404)
+
+
+class ShipmentAdminListView(APIView):
+    """GET /api/shipping/admin/ — List ALL shipments with filters (admin/staff)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = Shipment.objects.prefetch_related('tracking_events').all()
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(tracking_number__icontains=search) | qs.filter(order_number__icontains=search)
+        limit = min(int(request.query_params.get('limit', 100)), 200)
+        return Response(ShipmentSerializer(qs[:limit], many=True).data)

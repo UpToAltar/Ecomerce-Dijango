@@ -313,3 +313,66 @@ class ShippingTrackingCreateView(APIView):
             note=request.data.get('note', ''),
         )
         return Response(ShippingTrackingSerializer(tracking).data, status=status.HTTP_201_CREATED)
+
+
+class OrderAdminListView(APIView):
+    """GET /api/orders/admin/ — List ALL orders (admin/staff only)."""
+    permission_classes = [AllowAny]  # Auth enforced by gateway JWT check
+
+    def get(self, request):
+        qs = Order.objects.prefetch_related('items', 'tracking').all()
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(order_number__icontains=search)
+        limit = min(int(request.query_params.get('limit', 100)), 200)
+        return Response(OrderSerializer(qs[:limit], many=True).data)
+
+
+class OrderStatsView(APIView):
+    """GET /api/orders/stats/ — Order statistics for admin dashboard."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate
+        counts = Order.objects.values('status').annotate(count=Count('id'))
+        status_counts = {item['status']: item['count'] for item in counts}
+        # Revenue from paid/delivered/shipping orders
+        revenue_qs = Order.objects.filter(status__in=['paid', 'delivered', 'shipping'])
+        total_revenue = revenue_qs.aggregate(total=Sum('total_amount'))['total'] or 0
+        # Last 7 days daily revenue
+        from datetime import timedelta
+        from django.utils import timezone
+        since = timezone.now() - timedelta(days=7)
+        daily = (
+            Order.objects
+            .filter(created_at__gte=since, status__in=['paid', 'delivered', 'shipping'])
+            .annotate(date=TruncDate('created_at'))
+            .values('date')
+            .annotate(revenue=Sum('total_amount'), count=Count('id'))
+            .order_by('date')
+        )
+        return Response({
+            'total': Order.objects.count(),
+            'by_status': status_counts,
+            'total_revenue': str(total_revenue),
+            'daily_revenue': list(daily),
+        })
+
+
+class OrderDeleteView(APIView):
+    """DELETE /api/orders/<id>/ — Admin permanently deletes a cancelled order."""
+    permission_classes = [AllowAny]
+
+    def delete(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=404)
+        if order.status != Order.Status.CANCELLED:
+            return Response({'error': 'Only cancelled orders can be deleted'}, status=400)
+        order.delete()
+        return Response({'success': True}, status=204)

@@ -8,5 +8,8 @@ urlpatterns = [
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('validate/', views.ValidateTokenView.as_view(), name='validate_token'),
     path('users/', views.UserListView.as_view(), name='user_list'),
+    path('users/stats/', views.AdminUserStatsView.as_view(), name='user_stats'),
+    path('users/create-staff/', views.CreateStaffView.as_view(), name='create_staff'),
     path('users/<uuid:id>/', views.UserDetailView.as_view(), name='user_detail'),
+    path('users/<uuid:id>/status/', views.UpdateUserStatusView.as_view(), name='user_status'),
 ]

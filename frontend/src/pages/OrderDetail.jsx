@@ -6,6 +6,18 @@ import { useAuth } from '../context/AuthContext';
 
 const API = 'http://localhost:8000/api';
 
+const getOrderStatusInfo = (status) => {
+  switch(status?.toLowerCase()) {
+    case 'pending': return { text: 'Chờ xử lý', color: '#eab308', icon: <Clock size={16} /> };
+    case 'confirmed': return { text: 'Đã xác nhận', color: '#3b82f6', icon: <Package size={16} /> };
+    case 'paid': return { text: 'Đã thanh toán', color: '#8b5cf6', icon: <CheckCircle size={16} /> };
+    case 'shipping': return { text: 'Đang giao', color: '#f59e0b', icon: <Truck size={16} /> };
+    case 'delivered': return { text: 'Đã giao', color: '#16a34a', icon: <CheckCircle size={16} /> };
+    case 'cancelled': return { text: 'Đã hủy', color: '#dc2626', icon: <AlertCircle size={16} /> };
+    default: return { text: status || 'Không rõ', color: '#6b7280', icon: <Clock size={16} /> };
+  }
+};
+
 export default function OrderDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -121,11 +133,17 @@ export default function OrderDetail() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {(order.status === 'pending') && (
             <button onClick={handleCancelOrder} className="btn btn-outline" style={{ padding: '8px 16px', color: '#dc2626', borderColor: '#fca5a5' }}>
-              Huy don
+              Huỷ đơn
             </button>
           )}
-          <div style={{ padding: '8px 16px', borderRadius: '20px', background: 'var(--color-surface-elevated)', fontWeight: 600, textTransform: 'capitalize', border: '1px solid var(--color-border)' }}>
-            Trang thai: {order.status}
+          <div style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '8px 16px', borderRadius: '20px', background: 'var(--color-surface-elevated)', 
+            fontWeight: 600, border: '1px solid var(--color-border)',
+            color: getOrderStatusInfo(order.status).color
+          }}>
+            {getOrderStatusInfo(order.status).icon}
+            {getOrderStatusInfo(order.status).text}
           </div>
         </div>
       </div>
@@ -170,14 +188,18 @@ export default function OrderDetail() {
             ) : shipment ? (
               <div>
                 {/* Shipment header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', padding: '12px', background: 'var(--color-surface-elevated)', borderRadius: '8px' }}>
+                <div style={{ 
+                  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+                  gap: '16px', marginBottom: '16px', padding: '12px', 
+                  background: 'var(--color-surface-elevated)', borderRadius: '8px' 
+                }}>
                   <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Ma van don</div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{shipment.tracking_number}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Mã vận đơn</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>{shipment.tracking_number}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Don vi VC</div>
-                    <div style={{ fontWeight: 600 }}>{shipment.carrier}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Đơn vị VC</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{shipment.carrier}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: shipStatus?.color, fontWeight: 600, fontSize: '0.9rem' }}>
                     {shipStatus?.icon} {shipStatus?.text}

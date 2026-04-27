@@ -78,3 +78,12 @@ class UserAdminSerializer(serializers.ModelSerializer):
             'phone', 'role', 'address', 'is_active', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class CreateStaffSerializer(serializers.Serializer):
+    """Serializer for admin creating a staff user."""
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=6)
+    first_name = serializers.CharField(max_length=100, default='')
+    last_name = serializers.CharField(max_length=100, default='')
+    phone = serializers.CharField(max_length=20, allow_blank=True, default='')

@@ -10,13 +10,17 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await login(email, password);
-    if (success) {
-      navigate('/');
+    const user = await login(email, password);
+    if (user) {
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else if (user.role === 'staff') {
+        navigate('/staff');
+      } else {
+        navigate('/');
+      }
     } else {
-      alert("Login failed! Ensure backend auth-service is running.");
-      // For demo fallback:
-      login(email, password); navigate('/');
+      alert("Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản.");
     }
   };
 
